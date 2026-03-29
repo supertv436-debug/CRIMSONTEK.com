@@ -32,7 +32,7 @@
   </div>
 
   <div id="panel" class="box" style="display:none;">
-    <p>Фото, GIF и короткие ролики сохраняются локально в браузере (IndexedDB). Другие пользователи не могут добавлять — только просматривать ленту на странице OFFICIAL_MEDIA.</p>
+    <p>Фото, GIF и короткие ролики публикуются в общий облачный канал (Supabase). Лента будет одинаковой для всех пользователей на странице OFFICIAL_MEDIA.</p>
     <input type="file" id="f" accept="image/*,video/*">
     <textarea id="cap" placeholder="Подпись (необязательно)..." style="text-transform:none;"></textarea>
     <button type="button" class="btn" onclick="doUpload()">ДОБАВИТЬ В ОФИЦИАЛЬНУЮ ЛЕНТУ</button>
@@ -43,11 +43,12 @@
   <a href="media_wall.html">← К ЛЕНТЕ</a> · <a href="dashboard.html">HUB</a>
 
   <script src="crimson-config.js"></script>
-  <script src="crimson-media-db.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     var SESSION_KEY = 'crimson_admin_media_ok';
     var SESSION_MS = 8 * 60 * 60 * 1000;
     var MAX_BYTES = 48 * 1024 * 1024;
+    var sb = null;
 
     function sessionOk() {
       try {
@@ -71,10 +72,32 @@
         alert('НЕВЕРНЫЙ КЛЮЧ');
         return;
       }
+      if (!initSupabase()) {
+        alert('SUPABASE НЕ НАСТРОЕН В crimson-config.js');
+        return;
+      }
       setSession();
       document.getElementById('gate').style.display = 'none';
       document.getElementById('panel').style.display = 'block';
       refreshList();
+    }
+
+    function initSupabase() {
+      if (
+        !window.supabase ||
+        !CRIMSON_SUPABASE ||
+        !String(CRIMSON_SUPABASE.url || '').trim() ||
+        !String(CRIMSON_SUPABASE.anonKey || '').trim()
+      ) {
+        return false;
+      }
+      if (!sb) {
+        sb = window.supabase.createClient(
+          String(CRIMSON_SUPABASE.url).trim(),
+          String(CRIMSON_SUPABASE.anonKey).trim()
+        );
+      }
+      return true;
     }
 
     function kindFromMime(mime) {
@@ -96,37 +119,52 @@
       var mime = file.type || 'application/octet-stream';
       var kind = kindFromMime(mime);
       var id = 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
-      var rec = {
-        id: id,
-        type: kind,
-        mime: mime,
-        caption: (document.getElementById('cap').value || '').trim(),
-        t: Date.now(),
-        blob: file
-      };
-      crimsonMediaAdd(rec).then(function () {
+      var ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+      var path = 'media/' + id + '.' + (ext || 'bin');
+      var caption = (document.getElementById('cap').value || '').trim();
+      sb.storage.from(CRIMSON_SUPABASE.bucket).upload(path, file, {
+        upsert: false,
+        contentType: mime
+      }).then(function (up) {
+        if (up.error) throw up.error;
+        var pub = sb.storage.from(CRIMSON_SUPABASE.bucket).getPublicUrl(path);
+        var rec = {
+          id: id,
+          type: kind,
+          mime: mime,
+          caption: caption,
+          t: Date.now(),
+          media_url: pub && pub.data && pub.data.publicUrl ? pub.data.publicUrl : '',
+          storage_path: path,
+          owner: localStorage.getItem('c_user') || 'owner'
+        };
+        return sb.from(CRIMSON_SUPABASE.table).insert(rec);
+      }).then(function (ins) {
+        if (ins && ins.error) throw ins.error;
         document.getElementById('cap').value = '';
         inp.value = '';
         refreshList();
-      }).catch(function () {
-        alert('ОШИБКА СОХРАНЕНИЯ (ПАМЯТЬ БРАУЗЕРА?)');
+      }).catch(function (e) {
+        alert('ОШИБКА ПУБЛИКАЦИИ: ' + (e && e.message ? e.message : 'unknown'));
       });
     }
 
-    var previewUrls = [];
-
     function refreshList() {
-      crimsonMediaList().then(function (items) {
+      if (!initSupabase()) return;
+      sb.from(CRIMSON_SUPABASE.table)
+        .select('*')
+        .order('t', { ascending: false })
+        .limit(120)
+        .then(function (res) {
+        if (res.error) throw res.error;
+        var items = res.data || [];
         var el = document.getElementById('list');
-        previewUrls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
-        previewUrls = [];
         if (!items.length) {
           el.innerHTML = '<p style="text-transform:none;color:#600;">ПУСТО</p>';
           return;
         }
         el.innerHTML = items.map(function (it) {
-          var url = URL.createObjectURL(it.blob);
-          previewUrls.push(url);
+          var url = it.media_url || '';
           var media = it.type === 'video'
             ? '<video src="' + url + '" controls muted playsinline></video>'
             : '<img src="' + url + '" alt="">';
@@ -136,6 +174,8 @@
             media +
             '<button type="button" class="btn btn-del" onclick="removeItem(\'' + it.id + '\')">УДАЛИТЬ</button></div>';
         }).join('');
+      }).catch(function (e) {
+        document.getElementById('list').innerHTML = '<p style="text-transform:none;color:#a00;">ОШИБКА ЗАГРУЗКИ: ' + escapeHtml(e && e.message ? e.message : 'unknown') + '</p>';
       });
     }
 
@@ -145,10 +185,33 @@
 
     function removeItem(id) {
       if (!confirm('УДАЛИТЬ ЭТОТ ЭЛЕМЕНТ?')) return;
-      crimsonMediaDelete(id).then(refreshList);
+      if (!initSupabase()) return;
+      sb.from(CRIMSON_SUPABASE.table)
+        .select('id,storage_path')
+        .eq('id', id)
+        .maybeSingle()
+        .then(function (row) {
+          if (row.error) throw row.error;
+          if (row.data && row.data.storage_path) {
+            return sb.storage.from(CRIMSON_SUPABASE.bucket).remove([row.data.storage_path]).then(function () {
+              return row.data;
+            });
+          }
+          return row.data;
+        })
+        .then(function () {
+          return sb.from(CRIMSON_SUPABASE.table).delete().eq('id', id);
+        })
+        .then(function (delRes) {
+          if (delRes && delRes.error) throw delRes.error;
+          refreshList();
+        })
+        .catch(function (e) {
+          alert('ОШИБКА УДАЛЕНИЯ: ' + (e && e.message ? e.message : 'unknown'));
+        });
     }
 
-    if (sessionOk()) {
+    if (sessionOk() && initSupabase()) {
       document.getElementById('gate').style.display = 'none';
       document.getElementById('panel').style.display = 'block';
       refreshList();

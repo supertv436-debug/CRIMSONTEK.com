@@ -38,6 +38,21 @@ const CRIMSON_OTP = {
   ttlMs: 10 * 60 * 1000
 };
 
+/**
+ * OFFICIAL MEDIA — общий облачный канал через Supabase.
+ * Заполните перед публикацией:
+ * - url: https://xxxx.supabase.co
+ * - anonKey: публичный anon key
+ * - bucket: публичный bucket, например "official-media"
+ * - table: таблица метаданных, например "official_media_posts"
+ */
+const CRIMSON_SUPABASE = {
+  url: '',
+  anonKey: '',
+  bucket: 'official-media',
+  table: 'official_media_posts'
+};
+
 const CRIMSON_REGISTRY_KEY = 'crimson_phone_registry_v1';
 
 function crimsonGetAiKey() {

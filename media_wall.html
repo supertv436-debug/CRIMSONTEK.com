@@ -45,29 +45,53 @@
 <body>
   <div class="wrap">
     <h1>OFFICIAL_MEDIA</h1>
-    <p class="sub">Канал владельца: ролики, фото и GIF. Добавлять контент может только тот, у кого есть секретный ключ (страница admin_media).</p>
+    <p class="sub">Общий облачный канал владельца: ролики, фото и GIF. Добавлять контент может только тот, у кого есть секретный ключ (страница admin_media).</p>
     <div id="root"></div>
     <p style="margin-top:16px;"><a class="back" href="dashboard.html">&lt;— HUB</a></p>
   </div>
 
-  <script src="crimson-media-db.js"></script>
+  <script src="crimson-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     if (localStorage.getItem('c_verified') !== 'true') { window.location.href = 'operator_access.html'; }
-
-    var urls = [];
+    var sb = null;
+    function initSupabase() {
+      if (
+        !window.supabase ||
+        !CRIMSON_SUPABASE ||
+        !String(CRIMSON_SUPABASE.url || '').trim() ||
+        !String(CRIMSON_SUPABASE.anonKey || '').trim()
+      ) {
+        return false;
+      }
+      if (!sb) {
+        sb = window.supabase.createClient(
+          String(CRIMSON_SUPABASE.url).trim(),
+          String(CRIMSON_SUPABASE.anonKey).trim()
+        );
+      }
+      return true;
+    }
 
     function render() {
-      crimsonMediaList().then(function (items) {
+      if (!initSupabase()) {
+        document.getElementById('root').innerHTML = '<div class="empty">SUPABASE НЕ НАСТРОЕН. Заполните CRIMSON_SUPABASE в crimson-config.js.</div>';
+        return;
+      }
+      sb.from(CRIMSON_SUPABASE.table)
+        .select('*')
+        .order('t', { ascending: false })
+        .limit(300)
+        .then(function (res) {
+        if (res.error) throw res.error;
+        var items = res.data || [];
         var root = document.getElementById('root');
-        urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
-        urls = [];
         if (!items.length) {
           root.innerHTML = '<div class="empty">ЛЕНТА ПУСТА — ВЛАДЕЛЕЦ ЕЩЁ НИЧЕГО НЕ ДОБАВИЛ.</div>';
           return;
         }
         root.innerHTML = '<div class="grid">' + items.map(function (it) {
-          var url = URL.createObjectURL(it.blob);
-          urls.push(url);
+          var url = it.media_url || '';
           var media = it.type === 'video'
             ? '<video src="' + url + '" controls playsinline preload="metadata"></video>'
             : '<img src="' + url + '" alt="">';
@@ -76,16 +100,14 @@
             (it.caption ? '<div class="cap">' + escapeHtml(it.caption) + '</div>' : '') +
             media + '</div>';
         }).join('') + '</div>';
+      }).catch(function (e) {
+        document.getElementById('root').innerHTML = '<div class="empty">ОШИБКА ЗАГРУЗКИ ЛЕНТЫ: ' + escapeHtml(e && e.message ? e.message : 'unknown') + '</div>';
       });
     }
 
     function escapeHtml(s) {
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
-
-    window.addEventListener('beforeunload', function () {
-      urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
-    });
 
     render();
   </script>

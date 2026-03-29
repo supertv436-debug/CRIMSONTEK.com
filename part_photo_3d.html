@@ -11,6 +11,24 @@
     h1 { font-size: 0.88rem; color: var(--ct-red); letter-spacing: 0.1em; margin: 0 0 8px 0; }
     .lead { color: var(--ct-text2); font-size: 0.84rem; line-height: 1.5; max-width: 820px; margin-bottom: 14px; }
     .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 10px 0; }
+    .row input[type="text"], .row select {
+      background: #09090d;
+      border: 1px solid rgba(255,0,51,0.45);
+      color: var(--ct-text);
+      padding: 8px 10px;
+      min-width: 220px;
+      font-family: inherit;
+    }
+    .btn {
+      background: var(--ct-red);
+      color: #050505;
+      border: none;
+      padding: 9px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .muted { color: var(--ct-muted); font-size: 0.76rem; margin-top: 2px; }
     label { font-size: 0.78rem; color: var(--ct-muted); }
     input[type="range"] { width: 160px; accent-color: var(--ct-red); }
     #host { flex: 1; min-height: 420px; border: 1px solid rgba(255,0,51,0.4); background: #000; }
@@ -29,9 +47,21 @@
 
   <div class="row">
     <input type="file" id="file" accept="image/*">
+    <label>Режим
+      <select id="mode">
+        <option value="relief">ЛОКАЛЬНЫЙ РЕЛЬЕФ (быстро)</option>
+        <option value="trellis">TRELLIS 2 (фото → 3D модель)</option>
+      </select>
+    </label>
+    <input type="text" id="trellis-endpoint" placeholder="TRELLIS API URL" value="http://127.0.0.1:8000/generate">
+    <button type="button" class="btn" id="btn-gen-trellis">СОБРАТЬ 3D (TRELLIS)</button>
+    <span id="status" class="muted">Ожидание фото…</span>
+  </div>
+  <div class="row">
     <label>Глубина рельефа <input type="range" id="amp" min="0.05" max="1.2" step="0.05" value="0.45"></label>
     <label>Сегменты сетки <input type="range" id="seg" min="32" max="200" step="1" value="96"></label>
   </div>
+  <p class="muted">Для TRELLIS нужен серверный endpoint. Ожидается ответ JSON: <code>{ "modelUrl": "https://...model.glb" }</code> или <code>{ "glbBase64": "..." }</code>.</p>
 
   <div id="host"></div>
   <a class="back" href="dashboard.html">← HUB</a>
@@ -45,6 +75,7 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     var host = document.getElementById('host');
     var scene = new THREE.Scene();
@@ -68,7 +99,46 @@
     d2.position.set(-3, 2, -4);
     scene.add(d2);
 
-    var mesh = null;
+    var currentObject = null;
+    var gltfLoader = new GLTFLoader();
+    var statusEl = document.getElementById('status');
+    var endpointInput = document.getElementById('trellis-endpoint');
+    var modeInput = document.getElementById('mode');
+    var btnTrellis = document.getElementById('btn-gen-trellis');
+    try {
+      var savedEndpoint = localStorage.getItem('crimson_trellis_endpoint');
+      if (savedEndpoint) endpointInput.value = savedEndpoint;
+    } catch (e) {}
+
+    function setStatus(t, bad) {
+      statusEl.textContent = t;
+      statusEl.style.color = bad ? '#ff667a' : '';
+    }
+
+    function clearObject() {
+      if (!currentObject) return;
+      scene.remove(currentObject);
+      currentObject.traverse(function (obj) {
+        if (obj.isMesh) {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) obj.material.forEach(function (m) { if (m && m.dispose) m.dispose(); });
+            else if (obj.material.dispose) obj.material.dispose();
+          }
+        }
+      });
+      currentObject = null;
+    }
+
+    function fitToObject(obj) {
+      var box = new THREE.Box3().setFromObject(obj);
+      var size = box.getSize(new THREE.Vector3());
+      var center = box.getCenter(new THREE.Vector3());
+      controls.target.copy(center);
+      var radius = Math.max(size.x, size.y, size.z) * 0.8 + 0.4;
+      camera.position.set(center.x + radius, center.y + radius * 0.8, center.z + radius);
+      camera.lookAt(center);
+    }
 
     function sampleHeights(img, w, h) {
       var c = document.createElement('canvas');
@@ -86,12 +156,7 @@
     }
 
     function buildFromImage(img) {
-      if (mesh) {
-        scene.remove(mesh);
-        mesh.geometry.dispose();
-        mesh.material.dispose();
-        mesh = null;
-      }
+      clearObject();
       var S = parseInt(document.getElementById('seg').value, 10) || 96;
       var W = S + 1;
       var H = S + 1;
@@ -121,20 +186,94 @@
         roughness: 0.5,
         flatShading: false
       });
-      mesh = new THREE.Mesh(geo, mat);
-      scene.add(mesh);
+      currentObject = new THREE.Mesh(geo, mat);
+      scene.add(currentObject);
+      fitToObject(currentObject);
+      setStatus('Локальный рельеф построен.');
+    }
+
+    function loadGlbFromUrl(url) {
+      clearObject();
+      setStatus('Загрузка 3D-модели…');
+      gltfLoader.load(url, function (gltf) {
+        currentObject = gltf.scene;
+        scene.add(currentObject);
+        fitToObject(currentObject);
+        setStatus('TRELLIS-модель загружена.');
+      }, undefined, function (err) {
+        setStatus('Ошибка загрузки GLB: ' + (err && err.message ? err.message : 'unknown'), true);
+      });
+    }
+
+    async function generateViaTrellis(file) {
+      var endpoint = String(endpointInput.value || '').trim();
+      if (!endpoint) {
+        setStatus('Укажите TRELLIS API URL.', true);
+        return;
+      }
+      try { localStorage.setItem('crimson_trellis_endpoint', endpoint); } catch (e) {}
+      btnTrellis.disabled = true;
+      setStatus('TRELLIS: генерация 3D…');
+      try {
+        var fd = new FormData();
+        fd.append('image', file);
+        var res = await fetch(endpoint, { method: 'POST', body: fd });
+        var txt = await res.text();
+        var data;
+        try {
+          data = JSON.parse(txt);
+        } catch (e) {
+          throw new Error('Некорректный JSON от TRELLIS API');
+        }
+        if (!res.ok) {
+          throw new Error((data && (data.error || data.message)) || ('HTTP ' + res.status));
+        }
+        if (data.modelUrl) {
+          loadGlbFromUrl(String(data.modelUrl));
+          return;
+        }
+        if (data.glbBase64) {
+          var b = atob(String(data.glbBase64));
+          var len = b.length;
+          var arr = new Uint8Array(len);
+          for (var i = 0; i < len; i++) arr[i] = b.charCodeAt(i);
+          var blob = new Blob([arr], { type: 'model/gltf-binary' });
+          var objUrl = URL.createObjectURL(blob);
+          loadGlbFromUrl(objUrl);
+          return;
+        }
+        throw new Error('В ответе нет modelUrl/glbBase64');
+      } catch (e) {
+        setStatus('TRELLIS error: ' + (e.message || String(e)), true);
+      } finally {
+        btnTrellis.disabled = false;
+      }
     }
 
     document.getElementById('file').addEventListener('change', function (e) {
       var f = e.target.files[0];
       if (!f) return;
-      var url = URL.createObjectURL(f);
-      var im = new Image();
-      im.onload = function () {
-        buildFromImage(im);
-        URL.revokeObjectURL(url);
-      };
-      im.src = url;
+      if (modeInput.value === 'trellis') {
+        setStatus('Фото выбрано. Нажмите "СОБРАТЬ 3D (TRELLIS)".');
+      } else {
+        var url = URL.createObjectURL(f);
+        var im = new Image();
+        im.onload = function () {
+          buildFromImage(im);
+          URL.revokeObjectURL(url);
+        };
+        im.src = url;
+      }
+    });
+
+    btnTrellis.addEventListener('click', function () {
+      var inp = document.getElementById('file');
+      var f = inp.files && inp.files[0];
+      if (!f) {
+        setStatus('Сначала загрузите фото.', true);
+        return;
+      }
+      generateViaTrellis(f);
     });
 
     function onResize() {
@@ -149,6 +288,7 @@
 
     ['amp', 'seg'].forEach(function (id) {
       document.getElementById(id).addEventListener('input', function () {
+        if (modeInput.value !== 'relief') return;
         var inp = document.getElementById('file');
         if (!inp.files[0]) return;
         var f = inp.files[0];
@@ -161,6 +301,14 @@
         im.src = url;
       });
     });
+
+    modeInput.addEventListener('change', function () {
+      var trellis = modeInput.value === 'trellis';
+      document.getElementById('amp').disabled = trellis;
+      document.getElementById('seg').disabled = trellis;
+      setStatus(trellis ? 'Режим TRELLIS активен.' : 'Режим локального рельефа активен.');
+    });
+    modeInput.dispatchEvent(new Event('change'));
 
     function loop() {
       requestAnimationFrame(loop);
