@@ -83,7 +83,7 @@
                 <p class="hint">Один email — одна учётная запись (в этом браузере). Код подтверждения работает в demo-режиме: показывается на экране и уходит в Telegram админу.</p>
                 <button type="button" class="go go-sec" id="btn-otp">ПОЛУЧИТЬ КОД</button>
                 <div id="otp-row">
-                    <label class="hint" style="margin-top:14px;">Код из SMS / экрана</label>
+                    <label class="hint" style="margin-top:14px;">Код из EMAIL / экрана</label>
                     <div id="otp-demo" style="display:none;"></div>
                     <input type="text" id="otp" placeholder="6 цифр" autocomplete="one-time-code" maxlength="12">
                     <button type="button" class="go" id="btn-reg-finish">ЗАВЕРШИТЬ РЕГИСТРАЦИЮ</button>
@@ -145,6 +145,9 @@
         }
         function normEmail(v) {
             return String(v || '').trim().toLowerCase();
+        }
+        function getStoredContact() {
+            return localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '';
         }
         function isValidEmail(v) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail(v));
@@ -302,7 +305,7 @@
             localStorage.setItem('c_auth_rev', '2');
             const msgIn = crimsonFormatDossier('✅ CRIMSONTEK — ВХОД В СИСТЕМУ', {
                 login: (rec && rec.user) || u,
-                phone: localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '—',
+                phone: getStoredContact() || '—',
                 event: 'АВТОРИЗАЦИЯ',
                 note: localStorage.getItem('c_verified') === 'true' ? 'Верифицирован ранее.' : 'Требуется биометрия.'
             });

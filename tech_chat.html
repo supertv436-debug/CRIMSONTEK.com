@@ -138,6 +138,19 @@
     .blink { animation: blink 1.2s step-end infinite; }
     @keyframes blink { 50% { opacity: 0; } }
     a.back { color: var(--dim); font-size: 9px; }
+    .gh-note {
+      margin: 0 0 8px 0;
+      font-size: 10px;
+      color: #9dd;
+      text-transform: none;
+      line-height: 1.45;
+    }
+    #giscus-wrap {
+      background: #000;
+      border: 1px solid #300;
+      padding: 8px;
+      min-height: 80px;
+    }
   </style>
 </head>
 <body>
@@ -164,7 +177,7 @@
 
     <div class="panel">
       <h3>■ NET_LINK — ЛЕНТА (КОММЕНТАРИИ · ВПЕЧАТЛЕНИЯ · СНИМКИ)</h3>
-      <p style="margin:0 0 8px 0;font-size:9px;opacity:.85;text-transform:none;">Данные хранятся локально в браузере; при публикации копия уходит в Telegram для архива.</p>
+      <p style="margin:0 0 8px 0;font-size:9px;opacity:.85;text-transform:none;">Локальная лента хранится в этом браузере; при публикации копия уходит в Telegram для архива.</p>
       <div id="feed"></div>
       <div class="composer" style="margin-top:10px;">
         <textarea id="post-text" placeholder="ТЕКСТ СООБЩЕНИЯ / ВПЕЧАТЛЕНИЕ..."></textarea>
@@ -173,6 +186,14 @@
           <button type="button" class="btn" onclick="publishPost()">ОПУБЛИКОВАТЬ</button>
           <button type="button" class="btn btn-ghost" onclick="clearFeed()">ОЧИСТИТЬ ЛЕНТУ</button>
         </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>■ NET_LINK — ОБЩИЕ КОММЕНТАРИИ (GITHUB DISCUSSIONS)</h3>
+      <p class="gh-note">Этот блок общий для всех пользователей сайта. Комментарии хранятся в GitHub Discussions и видны всем, кто откроет страницу.</p>
+      <div id="giscus-wrap">
+        <div class="post"><span class="txt" style="opacity:.75">ЗАГРУЗКА ОБЩЕГО КАНАЛА…</span></div>
       </div>
     </div>
 
@@ -210,13 +231,21 @@
       sel.innerHTML = '<option value="">— модуль —</option>';
       MODULE_HELP.forEach(m => {
         const d = document.createElement('details');
-        d.innerHTML = `<summary>${m.name}</summary><p>${m.text}</p>`;
+        const summary = document.createElement('summary');
+        summary.textContent = m.name;
+        const para = document.createElement('p');
+        para.textContent = m.text;
+        d.appendChild(summary);
+        d.appendChild(para);
         root.appendChild(d);
         const o = document.createElement('option');
         o.value = m.id;
         o.textContent = m.name;
         sel.appendChild(o);
       });
+    }
+    function getOperatorContact() {
+      return localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '—';
     }
 
     function aiBrief() {
@@ -231,6 +260,12 @@
     }
 
     const FEED_KEY = 'crimson_net_feed';
+    const NETLINK_GH = {
+      repo: '', // пример: "owner/repo"
+      repoId: '', // из giscus.app
+      category: 'NET_LINK',
+      categoryId: '' // из giscus.app
+    };
 
     function loadFeed() {
       try {
@@ -277,7 +312,7 @@
 
         const cap = crimsonFormatDossier('🔔 CRIMSONTEK — ЛЕНТА NET_TERMINAL', {
           login: who,
-          phone: localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '—',
+          phone: getOperatorContact(),
           event: 'ПУБЛИКАЦИЯ В ЛЕНТЕ',
           note: (text || '') + (imgData ? '\n[вложение: изображение]' : '')
         });
@@ -307,9 +342,43 @@
       }
     }
 
+    function initSharedComments() {
+      var box = document.getElementById('giscus-wrap');
+      var ok =
+        NETLINK_GH &&
+        NETLINK_GH.repo &&
+        NETLINK_GH.repoId &&
+        NETLINK_GH.category &&
+        NETLINK_GH.categoryId;
+      if (!ok) {
+        box.innerHTML =
+          '<div class="post"><span class="txt" style="opacity:.7">ОБЩИЙ КАНАЛ НЕ НАСТРОЕН. Откройте giscus.app и заполните NETLINK_GH (repo/repoId/category/categoryId) в tech_chat.html.</span></div>';
+        return;
+      }
+      box.innerHTML = '';
+      var s = document.createElement('script');
+      s.src = 'https://giscus.app/client.js';
+      s.setAttribute('data-repo', NETLINK_GH.repo);
+      s.setAttribute('data-repo-id', NETLINK_GH.repoId);
+      s.setAttribute('data-category', NETLINK_GH.category);
+      s.setAttribute('data-category-id', NETLINK_GH.categoryId);
+      s.setAttribute('data-mapping', 'specific');
+      s.setAttribute('data-term', 'NET_LINK');
+      s.setAttribute('data-strict', '0');
+      s.setAttribute('data-reactions-enabled', '1');
+      s.setAttribute('data-emit-metadata', '0');
+      s.setAttribute('data-input-position', 'top');
+      s.setAttribute('data-theme', 'dark');
+      s.setAttribute('data-lang', 'ru');
+      s.setAttribute('crossorigin', 'anonymous');
+      s.async = true;
+      box.appendChild(s);
+    }
+
     document.getElementById('sess').textContent = 'OP: ' + (localStorage.getItem('c_user') || '—');
     renderManual();
     renderFeed();
+    initSharedComments();
   </script>
 </body>
 </html>
