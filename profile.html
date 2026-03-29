@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // ПРОФИЛЬ</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <link rel="stylesheet" href="crimson-app-shell.css">
+  <style>
+    .box { max-width: 520px; margin: 0 auto; padding: 20px 16px 80px; text-transform: none; }
+    .card {
+      background: linear-gradient(145deg, rgba(14, 14, 14, 0.95) 0%, rgba(20, 6, 8, 0.92) 100%);
+      border: 1px solid rgba(255, 0, 51, 0.42);
+      border-left: 4px solid rgba(255, 0, 51, 0.5);
+      padding: 20px 22px;
+      margin-bottom: 16px;
+      box-shadow: var(--ct-glow-lg);
+    }
+    .card h2 {
+      margin: 0 0 14px 0;
+      font-size: 0.72rem;
+      color: var(--ct-flash);
+      letter-spacing: 0.16em;
+      font-family: 'Orbitron', sans-serif;
+    }
+    .card p { margin: 0 0 10px 0; color: var(--ct-text2); font-size: 0.88rem; line-height: 1.55; }
+    .tag {
+      display: inline-block;
+      font-size: 0.62rem;
+      letter-spacing: 0.12em;
+      color: var(--ct-muted);
+      border: 1px solid rgba(255, 0, 51, 0.3);
+      padding: 4px 10px;
+      margin-top: 8px;
+      text-transform: uppercase;
+    }
+    a.link {
+      color: var(--ct-neon-soft);
+      display: inline-block;
+      margin-top: 14px;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(255, 77, 109, 0.35);
+    }
+    a.link:hover { color: var(--ct-flash); border-bottom-color: var(--ct-flash); }
+  </style>
+</head>
+<body class="ct-shell">
+  <header class="ct-topbar">
+    <button type="button" class="ct-burger" aria-label="Меню навигации"><span></span><span></span><span></span></button>
+    <h1 class="ct-topbar-title">Профиль · оператор</h1>
+  </header>
+  <div class="ct-drawer-overlay"></div>
+  <aside class="ct-drawer">
+    <div class="ct-drawer-header">
+      <p class="brand">CRIMSONTEK INDUSTRIES</p>
+      <p class="sub">Используйте меню для переходов</p>
+    </div>
+    <nav>
+      <div class="drawer-h">ОПЕРАЦИОННЫЙ УРОВЕНЬ</div>
+      <a href="index.html">Главная — новости</a>
+      <a href="profile.html">Профиль оператора</a>
+      <a href="operator_access.html">Регистрация / вход</a>
+      <div class="drawer-h">СИСТЕМА</div>
+      <a href="dashboard.html">COMMAND HUB</a>
+      <a href="workspaces_hub.html">WORKSPACES</a>
+      <a href="calc_hub.html">CALC HUB</a>
+      <a href="mechanisms_db.html">База механизмов</a>
+      <a href="media_wall.html">OFFICIAL MEDIA</a>
+      <a href="tech_chat.html">NET TERMINAL</a>
+    </nav>
+  </aside>
+
+  <main class="box">
+    <div class="card">
+      <h2>СТАТУС СЕССИИ</h2>
+      <p id="op-line">Статус: —</p>
+      <p id="op-user">OPERATOR_ID: —</p>
+      <p id="op-role" style="display:none;">Роль HUB: <strong id="role-txt"></strong></p>
+      <span class="tag" id="op-tag">—</span>
+      <div>
+        <a class="link" href="operator_access.html">Идентификация оператора</a>
+        <a class="link" href="dashboard.html" id="lnk-hub" style="display:none;">COMMAND HUB</a>
+      </div>
+    </div>
+    <div class="card">
+      <h2>ИНФОРМАЦИЯ</h2>
+      <p>Корпоративные модули и расчёты доступны после верификации (BIO_SCAN) и входа в COMMAND HUB. Роль на дашборде сохраняется в браузере.</p>
+      <p style="margin-top:12px;font-size:0.8rem;color:var(--ct-muted);line-height:1.5;">Если вы «не входили», но сайт открывается — в этом браузере уже сохранена прошлая сессия (логин и пароль в памяти страницы). Нажмите «Выйти», чтобы проверить экран входа.</p>
+    </div>
+    <div class="card">
+      <h2>ВЫХОД</h2>
+      <p style="margin-bottom:14px;">Сбросить локальную сессию на этом устройстве (потребуется снова войти или зарегистрироваться).</p>
+      <button type="button" id="btn-logout" style="padding:12px 20px;background:transparent;border:1px solid var(--ct-red);color:var(--ct-flash);font-family:inherit;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.1em;">Выйти из сессии</button>
+    </div>
+  </main>
+
+  <nav class="ct-bottom-nav ct-bottom-nav--solo">
+    <a href="index.html">ГЛАВНАЯ</a>
+  </nav>
+
+  <script src="crimson-app-shell.js"></script>
+  <script>
+    document.getElementById('btn-logout').onclick = function () {
+      if (typeof crimsonLogout === 'function') crimsonLogout();
+      else {
+        try {
+          localStorage.removeItem('c_user');
+          localStorage.removeItem('c_pass');
+          localStorage.removeItem('c_verified');
+          localStorage.removeItem('crimson_phone');
+          localStorage.removeItem('c_role');
+          localStorage.removeItem('crimson_ai_key');
+          localStorage.removeItem('crimson_admin_feed_unlock');
+        } catch (e) {}
+        location.href = 'operator_access.html';
+      }
+    };
+    var v = localStorage.getItem('c_verified') === 'true';
+    var roles = { universal: 'универсальный', architect: 'архитектор', developer: 'разработчик', analyst: 'аналитик', designer: 'дизайнер', chemist: 'химик' };
+    document.getElementById('op-line').textContent = 'Статус: ' + (v ? 'верифицирован · доступ к HUB' : 'ожидается верификация / гость');
+    document.getElementById('op-user').textContent = 'OPERATOR_ID: ' + (localStorage.getItem('c_user') || '—');
+    var r = localStorage.getItem('c_role') || 'universal';
+    if (roles[r]) {
+      document.getElementById('op-role').style.display = 'block';
+      document.getElementById('role-txt').textContent = roles[r];
+    }
+    document.getElementById('op-tag').textContent = v ? 'CLEARANCE: ACTIVE' : 'CLEARANCE: PENDING';
+    if (v) document.getElementById('lnk-hub').style.display = 'inline-block';
+  </script>
+</body>
+</html>

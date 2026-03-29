@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // MECH_DEMO (КУЛАЧОК)</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 16px; max-width: 900px; margin-left: auto; margin-right: auto; }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 0.9rem;
+      color: var(--ct-red);
+      letter-spacing: 0.12em;
+    }
+    .lead {
+      color: var(--ct-text2);
+      font-size: 0.88rem;
+      text-transform: none;
+      line-height: 1.5;
+      margin: 0 0 16px 0;
+    }
+    .stage {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    @media (max-width: 700px) { .stage { grid-template-columns: 1fr; } }
+    canvas {
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid rgba(255, 0, 51, 0.4);
+      background: var(--ct-bg2);
+      display: block;
+      margin: 0 auto;
+    }
+    .panel {
+      background: var(--ct-bg2);
+      border: 1px solid rgba(255, 0, 51, 0.35);
+      padding: 14px;
+      box-shadow: var(--ct-glow-lg);
+    }
+    .panel h2 {
+      margin: 0 0 10px 0;
+      font-size: 0.75rem;
+      color: var(--ct-flash);
+      letter-spacing: 0.15em;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--ct-text2); margin-top: 10px; text-transform: none; }
+    input[type="range"] { width: 100%; accent-color: var(--ct-red); margin-top: 6px; }
+    .vals { font-family: ui-monospace, monospace; font-size: 0.78rem; color: var(--ct-neon-soft); margin-top: 10px; text-transform: none; }
+    a.back { color: var(--ct-neon-soft); font-size: 0.82rem; display: inline-block; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>МЕХАНИЗМЫ · ДИСКОВЫЙ КУЛАЧОК</h1>
+  <p class="lead">Учебная анимация: эксцентрик радиуса <em>e</em> вращается с угловой скоростью ω. Поступательное смещение толкателя <strong>s(φ) = e(1 − cos φ)</strong>, скорость и ускорение получаются дифференцированием по времени. Подстройте обороты и эксцентриситет.</p>
+
+  <div class="stage">
+    <canvas id="cam" width="400" height="360"></canvas>
+    <div class="panel">
+      <h2>ПАРАМЕТРЫ</h2>
+      <label for="rpm">Обороты, об/мин</label>
+      <input type="range" id="rpm" min="10" max="240" value="72">
+      <label for="ecc">Эксцентриситет e, мм</label>
+      <input type="range" id="ecc" min="5" max="60" value="28">
+      <div class="vals" id="out"></div>
+    </div>
+  </div>
+
+  <canvas id="graph" width="800" height="220" style="width:100%;max-width:800px;margin-top:16px;border:1px solid rgba(255,0,51,0.35);"></canvas>
+  <p class="lead" style="margin-top:12px;">График: синий — s, красный — v (усл. ед.), зелёный — a (усл. ед.) за два оборота.</p>
+
+  <a class="back" href="calc_hub.html">← CALC_HUB</a>
+
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('mech_demo'); } catch (e) {}
+
+    var cam = document.getElementById('cam');
+    var g = document.getElementById('graph');
+    var cctx = cam.getContext('2d');
+    var gctx = g.getContext('2d');
+    var rpmEl = document.getElementById('rpm');
+    var eccEl = document.getElementById('ecc');
+    var outEl = document.getElementById('out');
+
+    var t0 = performance.now() / 1000;
+
+    function drawCam(t) {
+      var w = cam.width;
+      var h = cam.height;
+      var cx = w * 0.45;
+      var cy = h * 0.55;
+      var R = 55;
+      var e = Number(eccEl.value);
+      var rpm = Number(rpmEl.value);
+      var omega = rpm * 2 * Math.PI / 60;
+      var phi = omega * t;
+
+      cctx.fillStyle = '#0b0b0b';
+      cctx.fillRect(0, 0, w, h);
+
+      cctx.strokeStyle = '#442233';
+      cctx.strokeRect(0, 0, w, h);
+
+      cctx.strokeStyle = '#ff003355';
+      cctx.setLineDash([4, 6]);
+      cctx.beginPath();
+      cctx.moveTo(0, cy);
+      cctx.lineTo(w, cy);
+      cctx.stroke();
+      cctx.setLineDash([]);
+
+      cctx.strokeStyle = '#662244';
+      cctx.lineWidth = 3;
+      cctx.beginPath();
+      cctx.arc(cx, cy, R, 0, Math.PI * 2);
+      cctx.stroke();
+
+      var px = cx + e * Math.cos(phi);
+      var py = cy - e * Math.sin(phi);
+      cctx.fillStyle = '#ff0033';
+      cctx.beginPath();
+      cctx.arc(px, py, 9, 0, Math.PI * 2);
+      cctx.fill();
+
+      var sx = px;
+      var sy = cy - R - 40 - e * (1 - Math.cos(phi));
+      cctx.strokeStyle = '#00ffc8';
+      cctx.lineWidth = 2;
+      cctx.beginPath();
+      cctx.moveTo(sx, py);
+      cctx.lineTo(sx, sy);
+      cctx.stroke();
+      cctx.fillStyle = '#00ffc8';
+      cctx.fillRect(sx - 35, sy - 18, 70, 16);
+
+      outEl.textContent = 'φ = ' + (phi * 180 / Math.PI % 360).toFixed(1) + '°  ·  s = ' + (e * (1 - Math.cos(phi))).toFixed(2) + ' мм  ·  ω = ' + omega.toFixed(3) + ' рад/с';
+
+      return { e: e, omega: omega, phi: phi };
+    }
+
+    function drawGraph() {
+      var e = Number(eccEl.value);
+      var rpm = Number(rpmEl.value);
+      var omega = rpm * 2 * Math.PI / 60;
+      var w = g.width;
+      var h = g.height;
+      gctx.fillStyle = '#0b0b0b';
+      gctx.fillRect(0, 0, w, h);
+      gctx.strokeStyle = '#331122';
+      gctx.strokeRect(0, 0, w, h);
+
+      var twoTurn = 4 * Math.PI / omega;
+      if (!isFinite(twoTurn) || twoTurn <= 0) return;
+      var pad = 24;
+      var gw = w - pad * 2;
+      var gh = h - pad * 2;
+
+      function plot(arr, color, scaleY, offsetY) {
+        gctx.strokeStyle = color;
+        gctx.lineWidth = 1.5;
+        gctx.beginPath();
+        for (var i = 0; i <= 200; i++) {
+          var u = i / 200;
+          var time = u * twoTurn;
+          var ph = omega * time;
+          var val = arr(ph);
+          var x = pad + u * gw;
+          var y = pad + gh * 0.5 - (val * scaleY + offsetY) * gh * 0.4;
+          if (i === 0) gctx.moveTo(x, y);
+          else gctx.lineTo(x, y);
+        }
+        gctx.stroke();
+      }
+
+      plot(function (ph) { return (e * (1 - Math.cos(ph))) / 60; }, '#4488ff', 1, 0);
+      plot(function (ph) { return (e * omega * Math.sin(ph)) / 200; }, '#ff0044', 1, 0);
+      plot(function (ph) { return (e * omega * omega * Math.cos(ph)) / 8000; }, '#00cc88', 1, 0);
+
+      gctx.fillStyle = '#888';
+      gctx.font = '11px Rajdhani, sans-serif';
+      gctx.fillText('2 оборота · e=' + e + ' мм · ' + rpm + ' об/мин', pad, h - 8);
+    }
+
+    function frame(now) {
+      var t = now / 1000 - t0;
+      drawCam(t);
+      drawGraph();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    rpmEl.addEventListener('input', function () {});
+    eccEl.addEventListener('input', function () {});
+  </script>
+</body>
+</html>

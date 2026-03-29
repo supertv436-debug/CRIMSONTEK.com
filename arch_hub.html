@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // ARCH_HUB</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 0; display: flex; flex-direction: column; min-height: 100vh; }
+    header { padding: 12px 16px; border-bottom: 1px solid rgba(255,0,51,0.35); background: var(--ct-bg2); z-index: 10; }
+    header h1 { margin: 0; font-size: 0.82rem; color: var(--ct-red); letter-spacing: 0.15em; }
+    header p { margin: 8px 0 0 0; font-size: 0.78rem; color: var(--ct-text2); text-transform: none; max-width: 900px; line-height: 1.45; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: var(--ct-bg); border-bottom: 1px solid rgba(255,0,51,0.2); }
+    nav button {
+      background: var(--ct-organic); color: var(--ct-text); border: 1px solid var(--ct-muted);
+      padding: 10px 14px; font-family: inherit; font-size: 0.68rem; letter-spacing: 0.08em; cursor: pointer;
+    }
+    nav button.on { border-color: var(--ct-flash); color: var(--ct-flash); box-shadow: var(--ct-glow); }
+    .tab { display: none; padding: 14px 16px 80px; flex: 1; text-transform: none; color: var(--ct-text2); font-size: 0.86rem; }
+    .tab.active { display: block; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
+    label { font-size: 0.75rem; color: var(--ct-muted); display: block; margin-bottom: 4px; }
+    input, select { background: var(--ct-bg2); border: 1px solid var(--ct-red-dark); color: var(--ct-text); padding: 8px; font-family: inherit; }
+    .canvas-box { width: 100%; max-width: 900px; height: min(62vh, 520px); border: 1px solid rgba(255,0,51,0.4); background: #000; margin: 12px 0; }
+    .site-canvas { border: 1px solid rgba(255,0,51,0.4); background: var(--ct-bg2); cursor: crosshair; display: block; max-width: 100%; }
+    a.back { color: var(--ct-neon-soft); font-size: 0.8rem; }
+    #vr-btn-wrap { margin-top: 12px; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }}
+  </script>
+</head>
+<body>
+  <header>
+    <h1>ARCH_HUB · АРХИТЕКТУРА И УЧАСТОК</h1>
+    <p>Прототипы для архитекторов: этажность, солнечный свет с тенями (упрощённая модель), расчёт площадей/объёма материала, эскиз участка, подбор цветов. WebXR — если браузер и устройство поддерживают (часто нужен HTTPS).</p>
+  </header>
+  <nav id="tabs">
+    <button type="button" data-tab="bld" class="on">3D ЗДАНИЕ</button>
+    <button type="button" data-tab="sun">СОЛНЦЕ / ТЕНИ</button>
+    <button type="button" data-tab="mat">ПЛОЩАДИ / МАТЕРИАЛ</button>
+    <button type="button" data-tab="site">ПЛАН УЧАСТКА</button>
+    <button type="button" data-tab="pal">ПАЛИТРА</button>
+    <button type="button" data-tab="vr">VR-ПРОСМОТР</button>
+  </nav>
+
+  <div id="tab-bld" class="tab active">
+    <div class="row">
+      <div><label>Этажей</label><input type="number" id="floors" value="4" min="1" max="24" step="1" style="width:80px"></div>
+      <div><label>Длина, м</label><input type="number" id="len" value="24" min="4" step="1" style="width:80px"></div>
+      <div><label>Ширина, м</label><input type="number" id="wid" value="16" min="4" step="1" style="width:80px"></div>
+      <div><label>Высота этажа, м</label><input type="number" id="fh" value="3.2" min="2.2" step="0.1" style="width:80px"></div>
+      <button type="button" id="btn-rebuild" class="ct-btn-primary" style="padding:10px 16px;">ПЕРЕСТРОИТЬ</button>
+    </div>
+    <div id="cv-build" class="canvas-box"></div>
+  </div>
+
+  <div id="tab-sun" class="tab">
+    <div class="row">
+      <div><label>Широта, °</label><input type="number" id="lat" value="55.75" step="0.1"></div>
+      <div><label>День года (1–365)</label><input type="number" id="doy" value="172" min="1" max="365"></div>
+      <div><label>Час (локальный солнечный)</label><input type="number" id="hr" value="12" min="0" max="23" step="0.5"></div>
+    </div>
+    <p>Упрощённая геометрия: направление света считается по приближению для обучающей визуализации, не для нормативного расчёта освещённости.</p>
+    <div id="cv-sun" class="canvas-box"></div>
+  </div>
+
+  <div id="tab-mat" class="tab">
+    <div class="row">
+      <div><label>Длина, м</label><input type="number" id="m-l" value="12" min="0.1" step="0.1"></div>
+      <div><label>Ширина, м</label><input type="number" id="m-w" value="8" min="0.1" step="0.1"></div>
+      <div><label>Высота/толщина слоя, м</label><input type="number" id="m-h" value="0.2" min="0.01" step="0.01"></div>
+      <div><label>Плотность кг/м³</label><input type="number" id="m-rho" value="2400" min="1"></div>
+    </div>
+    <button type="button" id="btn-calc-mat" class="ct-btn-primary" style="padding:10px 16px;">РАССЧИТАТЬ</button>
+    <pre id="mat-out" style="background:var(--ct-bg);padding:14px;border:1px solid var(--ct-bg3);color:var(--ct-flash);margin-top:14px;font-size:0.88rem;"></pre>
+  </div>
+
+  <div id="tab-site" class="tab">
+    <p>Обведите прямоугольник участка мышью (отпустите — фиксация). Масштаб условный: укажите метры на сторону ниже.</p>
+    <div class="row">
+      <div><label>Ширина поля, м (логический)</label><input type="number" id="site-scale" value="50" min="10"></div>
+      <button type="button" id="site-clear" style="padding:10px 16px;background:var(--ct-organic);color:var(--ct-flash);border:1px solid var(--ct-red);cursor:pointer;">ОЧИСТИТЬ</button>
+    </div>
+    <canvas id="site" class="site-canvas" width="700" height="380"></canvas>
+    <p id="site-info" style="color:var(--ct-neon-soft)"></p>
+  </div>
+
+  <div id="tab-pal" class="tab">
+    <p>Базовый цвет — остальные гармонии считаются в HSL.</p>
+    <div class="row">
+      <div><label>HEX</label><input type="color" id="base-col" value="#ff0033"></div>
+      <div id="pal-swatch" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+  </div>
+
+  <div id="tab-vr" class="tab">
+    <p>Откройте вкладку «3D ЗДАНИЕ», постройте модель, затем нажмите кнопку — сцена откроется в WebXR (VR-шлем или тестовая среда в Chrome). Если кнопки нет — среда не поддерживается.</p>
+    <div id="vr-btn-wrap"></div>
+  </div>
+
+  <p style="padding:0 16px;"><a class="back" href="dashboard.html">← HUB</a></p>
+
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('arch_hub'); } catch(e){}
+
+    document.querySelectorAll('#tabs button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        var id = b.getAttribute('data-tab');
+        document.querySelectorAll('.tab').forEach(function (t) { t.classList.toggle('active', t.id === 'tab-' + id); });
+        if (id === 'bld' && window.__archResizeBuild) window.__archResizeBuild();
+        if (id === 'sun' && window.__archResizeSun) window.__archResizeSun();
+      });
+    });
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+    function hexToRgb(hex) {
+      var h = hex.replace('#','');
+      return { r: parseInt(h.slice(0,2),16)/255, g: parseInt(h.slice(2,4),16)/255, b: parseInt(h.slice(4,6),16)/255 };
+    }
+
+    function approxSunAltAz(lat, day, hour) {
+      var P = Math.PI / 180;
+      var decl = 23.45 * P * Math.sin((2 * Math.PI / 365) * (284 + day));
+      var latr = lat * P;
+      var h = (hour - 12) * 15 * P;
+      var sinEl = Math.sin(latr) * Math.sin(decl) + Math.cos(latr) * Math.cos(decl) * Math.cos(h);
+      sinEl = Math.max(-1, Math.min(1, sinEl));
+      var el = Math.asin(sinEl);
+      var cosAz = (Math.sin(decl) - Math.sin(latr) * sinEl) / (Math.cos(latr) * Math.cos(el) + 1e-9);
+      cosAz = Math.max(-1, Math.min(1, cosAz));
+      var az = Math.acos(cosAz);
+      if (Math.sin(h) > 0) az = 2 * Math.PI - az;
+      return { altDeg: el / P, azDeg: az / P };
+    }
+
+    var hostB = document.getElementById('cv-build');
+    var sceneB = new THREE.Scene();
+    sceneB.background = new THREE.Color(0x060608);
+    var camB = new THREE.PerspectiveCamera(50, 1, 0.5, 500);
+    camB.position.set(40, 35, 50);
+    var renB = new THREE.WebGLRenderer({ antialias: true });
+    renB.setPixelRatio(Math.min(devicePixelRatio, 2));
+    hostB.appendChild(renB.domElement);
+    var ctrlB = new OrbitControls(camB, renB.domElement);
+    ctrlB.enableDamping = true;
+    var groupB = new THREE.Group();
+    sceneB.add(groupB);
+    sceneB.add(new THREE.AmbientLight(0x8899aa, 0.7));
+    var dlB = new THREE.DirectionalLight(0xffeecc, 0.9);
+    dlB.position.set(30, 80, 20);
+    sceneB.add(dlB);
+    sceneB.add(new THREE.GridHelper(120, 24, 0x661122, 0x1a0a12));
+
+    function rebuildBuilding() {
+      while (groupB.children.length) groupB.remove(groupB.children[0]);
+      var fl = Math.max(1, parseInt(document.getElementById('floors').value, 10) || 1);
+      var L = parseFloat(document.getElementById('len').value) || 20;
+      var W = parseFloat(document.getElementById('wid').value) || 14;
+      var Hf = parseFloat(document.getElementById('fh').value) || 3;
+      var mat = new THREE.MeshStandardMaterial({ color: 0xaa3344, metalness: 0.15, roughness: 0.65 });
+      for (var i = 0; i < fl; i++) {
+        var g = new THREE.BoxGeometry(L, Hf, W);
+        var m = new THREE.Mesh(g, mat);
+        m.position.y = Hf * (i + 0.5);
+        m.castShadow = true;
+        groupB.add(m);
+      }
+      ctrlB.target.set(0, fl * Hf * 0.35, 0);
+    }
+    document.getElementById('btn-rebuild').onclick = rebuildBuilding;
+    rebuildBuilding();
+
+    function resizeB() {
+      var w = hostB.clientWidth || 600;
+      var h = hostB.clientHeight || 400;
+      camB.aspect = w / h;
+      camB.updateProjectionMatrix();
+      renB.setSize(w, h);
+    }
+    window.__archResizeBuild = resizeB;
+    resizeB();
+    window.addEventListener('resize', resizeB);
+
+    function loopB() {
+      requestAnimationFrame(loopB);
+      ctrlB.update();
+      renB.render(sceneB, camB);
+    }
+    loopB();
+
+    var hostS = document.getElementById('cv-sun');
+    var sceneS = new THREE.Scene();
+    sceneS.background = new THREE.Color(0x04060a);
+    var camS = new THREE.PerspectiveCamera(45, 1, 1, 300);
+    camS.position.set(35, 28, 42);
+    var renS = new THREE.WebGLRenderer({ antialias: true });
+    renS.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renS.shadowMap.enabled = true;
+    hostS.appendChild(renS.domElement);
+    var ctrlS = new OrbitControls(camS, renS.domElement);
+    ctrlS.enableDamping = true;
+    var sunLight = new THREE.DirectionalLight(0xfff5e6, 1.15);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.setScalar(2048);
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 200;
+    sunLight.shadow.camera.left = sunLight.shadow.camera.bottom = -45;
+    sunLight.shadow.camera.right = sunLight.shadow.camera.top = 45;
+    sceneS.add(sunLight);
+    sceneS.add(sunLight.target);
+    sceneS.add(new THREE.AmbientLight(0x334466, 0.35));
+    var gS = new THREE.PlaneGeometry(120, 120);
+    gS.rotateX(-Math.PI / 2);
+    var ground = new THREE.Mesh(gS, new THREE.MeshStandardMaterial({ color: 0x222028 }));
+    ground.receiveShadow = true;
+    sceneS.add(ground);
+    var boxS = new THREE.Mesh(
+      new THREE.BoxGeometry(12, 18, 16),
+      new THREE.MeshStandardMaterial({ color: 0x994455 })
+    );
+    boxS.position.set(0, 9, 0);
+    boxS.castShadow = true;
+    boxS.receiveShadow = true;
+    sceneS.add(boxS);
+    var helper = new THREE.Mesh(
+      new THREE.SphereGeometry(1.8, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffee88 })
+    );
+    sceneS.add(helper);
+
+    function updateSun() {
+      var lat = parseFloat(document.getElementById('lat').value) || 55;
+      var day = parseInt(document.getElementById('doy').value, 10) || 80;
+      var hr = parseFloat(document.getElementById('hr').value) || 12;
+      var p = approxSunAltAz(lat, day, hr);
+      var rad = 85;
+      var alt = p.altDeg * Math.PI / 180;
+      var az = p.azDeg * Math.PI / 180;
+      var y = rad * Math.sin(alt);
+      var h = rad * Math.cos(alt);
+      sunLight.position.set(h * Math.sin(az), y, h * Math.cos(az));
+      sunLight.target.position.set(0, 0, 0);
+      sunLight.target.updateMatrixWorld();
+      helper.position.copy(sunLight.position.clone().normalize().multiplyScalar(72));
+    }
+    ['lat','doy','hr'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', updateSun);
+    });
+    updateSun();
+
+    function resizeS() {
+      var w = hostS.clientWidth || 600;
+      var h = hostS.clientHeight || 400;
+      camS.aspect = w / h;
+      camS.updateProjectionMatrix();
+      renS.setSize(w, h);
+    }
+    window.__archResizeSun = resizeS;
+    resizeS();
+
+    function loopS() {
+      requestAnimationFrame(loopS);
+      ctrlS.update();
+      updateSun();
+      renS.render(sceneS, camS);
+    }
+    loopS();
+
+    document.getElementById('btn-calc-mat').onclick = function () {
+      var l = parseFloat(document.getElementById('m-l').value);
+      var w = parseFloat(document.getElementById('m-w').value);
+      var h = parseFloat(document.getElementById('m-h').value);
+      var rho = parseFloat(document.getElementById('m-rho').value);
+      var area = l * w;
+      var vol = area * h;
+      var mass = vol * rho;
+      document.getElementById('mat-out').textContent =
+        'Площадь горизонтальной проекции: ' + area.toFixed(2) + ' м²\n' +
+        'Объём слоя/тела: ' + vol.toFixed(3) + ' м³\n' +
+        'Масса (ρ=' + rho + '): ' + mass.toFixed(1) + ' кг';
+    };
+    document.getElementById('btn-calc-mat').click();
+
+    (function siteDraw() {
+      var c = document.getElementById('site');
+      var ctx = c.getContext('2d');
+      var drag = null;
+      var dragging = false;
+      function draw() {
+        ctx.fillStyle = '#0b0b0b';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.strokeStyle = 'rgba(255,0,51,0.35)';
+        ctx.strokeRect(0.5, 0.5, c.width - 1, c.height - 1);
+        for (var i = 0; i <= 10; i++) {
+          ctx.beginPath();
+          ctx.moveTo((c.width * i) / 10, 0);
+          ctx.lineTo((c.width * i) / 10, c.height);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(0, (c.height * i) / 10);
+          ctx.lineTo(c.width, (c.height * i) / 10);
+          ctx.stroke();
+        }
+        if (drag) {
+          ctx.strokeStyle = '#ff0033';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(drag.x0, drag.y0, drag.x1 - drag.x0, drag.y1 - drag.y0);
+        }
+      }
+      draw();
+      c.onmousedown = function (e) {
+        dragging = true;
+        var r = c.getBoundingClientRect();
+        var x = e.clientX - r.left, y = e.clientY - r.top;
+        drag = { x0: x, y0: y, x1: x, y1: y };
+        draw();
+      };
+      c.onmousemove = function (e) {
+        if (!dragging || !drag) return;
+        var r = c.getBoundingClientRect();
+        drag.x1 = e.clientX - r.left;
+        drag.y1 = e.clientY - r.top;
+        draw();
+      };
+      c.onmouseup = function () {
+        if (!dragging || !drag) return;
+        dragging = false;
+        draw();
+        var scl = parseFloat(document.getElementById('site-scale').value) || 40;
+        var dx = Math.abs(drag.x1 - drag.x0) / c.width * scl;
+        var dy = Math.abs(drag.y1 - drag.y0) / c.height * (scl * c.height / c.width);
+        document.getElementById('site-info').textContent =
+          'Условный прямоугольник ~ ' + dx.toFixed(1) + ' × ' + dy.toFixed(1) + ' м. Площадь ~ ' + (dx * dy).toFixed(0) + ' м²';
+      };
+      c.onmouseleave = function () { dragging = false; };
+      document.getElementById('site-clear').onclick = function () { drag = null; dragging = false; draw(); document.getElementById('site-info').textContent = ''; };
+    })();
+
+    function hslHarmony(hex) {
+      var rgb = hexToRgb(hex);
+      var r = rgb.r, g = rgb.g, b = rgb.b;
+      var max = Math.max(r,g,b), min = Math.min(r,g,b);
+      var h, s, l = (max + min) / 2;
+      var d = max - min;
+      s = d < 1e-6 ? 0 : d / (1 - Math.abs(2 * l - 1));
+      if (d < 1e-6) h = 0;
+      else if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+      function toHex(rr, gg, bb) {
+        return '#' + [rr,gg,bb].map(function (x) { return Math.round(x * 255).toString(16).padStart(2,'0'); }).join('');
+      }
+      function fromHsl(H,S,L) {
+        var a = S * Math.min(L, 1 - L);
+        function f(n) {
+          var k = (n + H * 12) % 12;
+          return L - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        }
+        return toHex(f(0), f(8), f(4));
+      }
+      var out = [hex];
+      out.push(fromHsl((h + 1/3) % 1, s * 0.85, l));
+      out.push(fromHsl((h + 2/3) % 1, s * 0.85, l));
+      out.push(fromHsl(h, s * 0.5, Math.min(0.92, l + 0.15)));
+      out.push(fromHsl(h, s, Math.max(0.08, l - 0.2)));
+      return out;
+    }
+    function refreshPalette() {
+      var hex = document.getElementById('base-col').value;
+      var sw = document.getElementById('pal-swatch');
+      sw.innerHTML = '';
+      hslHarmony(hex).forEach(function (col) {
+        var d = document.createElement('div');
+        d.style.width = '56px';
+        d.style.height = '56px';
+        d.style.background = col;
+        d.style.border = '1px solid rgba(255,255,255,0.2)';
+        d.title = col;
+        sw.appendChild(d);
+      });
+    }
+    document.getElementById('base-col').addEventListener('input', refreshPalette);
+    refreshPalette();
+
+    var vrWrap = document.getElementById('vr-btn-wrap');
+    renB.xr.enabled = true;
+    if (vrWrap) {
+      var vb = VRButton.createButton(renB);
+      vb.style.position = 'relative';
+      vb.style.bottom = 'auto';
+      vb.style.left = 'auto';
+      vrWrap.appendChild(vb);
+    }
+    setTimeout(function () {
+      if (vrWrap && !vrWrap.querySelector('button')) {
+        vrWrap.innerHTML = '<p style="color:var(--ct-muted)">WebXR не обнаружен или откройте через HTTPS.</p>';
+      }
+    }, 500);
+  </script>
+</body>
+</html>

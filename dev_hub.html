@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // DEV_HUB</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; display: grid; grid-template-columns: 1fr 1fr; min-height: 100vh; font-size: 0.86rem; }
+    @media (max-width: 900px) { body { grid-template-columns: 1fr; } }
+    .panel { border-right: 1px solid rgba(255,0,51,0.3); display: flex; flex-direction: column; min-height: 50vh; }
+    .panel:last-child { border-right: none; }
+    .ph { padding: 10px 14px; background: var(--ct-bg2); border-bottom: 1px solid rgba(255,0,51,0.25); }
+    .ph h1 { margin: 0; font-size: 0.78rem; color: var(--ct-red); letter-spacing: 0.12em; }
+    .ph p { margin: 6px 0 0 0; color: var(--ct-text2); text-transform: none; font-size: 0.8rem; line-height: 1.45; }
+    #term {
+      flex: 1;
+      background: linear-gradient(165deg, #0a1520 0%, #050810 40%, #0d0508 100%);
+      color: #7af0c8;
+      font-family: ui-monospace, 'Consolas', monospace;
+      font-size: 0.82rem;
+      padding: 12px;
+      overflow-y: auto;
+      text-transform: none;
+      line-height: 1.5;
+      text-shadow: 0 0 8px rgba(0, 255, 200, 0.15);
+      border-top: 1px solid rgba(0, 255, 200, 0.12);
+    }
+    .cmdline { display: flex; gap: 8px; padding: 10px; background: #070d14; border-top: 1px solid rgba(255,0,51,0.2); }
+    .cmdline span { color: var(--ct-flash); font-family: monospace; padding-top: 8px; }
+    .cmdline input {
+      flex: 1; background: transparent; border: none; color: #e8fff8;
+      font-family: ui-monospace, monospace; font-size: 0.88rem; outline: none;
+    }
+    .ai-box { padding: 14px; flex: 1; display: flex; flex-direction: column; text-transform: none; }
+    .ai-box textarea {
+      width: 100%; flex: 1; min-height: 140px; box-sizing: border-box;
+      background: var(--ct-bg); border: 1px solid var(--ct-red-dark); color: var(--ct-text);
+      padding: 12px; font-family: inherit; font-size: 0.88rem; resize: vertical;
+    }
+    .ai-box button { margin-top: 10px; padding: 12px; background: var(--ct-red); color: #050505; border: none; font-weight: 700; cursor: pointer; box-shadow: var(--ct-glow); }
+    .ai-out { margin-top: 12px; padding: 12px; background: var(--ct-bg2); border: 1px solid var(--ct-bg3); color: var(--ct-text); max-height: 220px; overflow-y: auto; font-size: 0.84rem; white-space: pre-wrap; }
+    .tools { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(255,0,51,0.2); }
+    .tools button { padding: 8px 12px; background: var(--ct-organic); color: var(--ct-flash); border: 1px solid var(--ct-red); cursor: pointer; font-size: 0.72rem; }
+    a.back { display: block; padding: 12px 14px; color: var(--ct-neon-soft); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="ph">
+      <h1>TERMINAL · CRIMSON_DEV</h1>
+      <p>Локальная симуляция консоли. Команды: <code>help</code>, <code>clear</code>, <code>ls</code>, <code>status</code>, <code>scan</code>, <code>ai ваш запрос…</code> (нужен API-ключ на HUB).</p>
+    </div>
+    <div id="term"></div>
+    <div class="cmdline">
+      <span>&gt;</span>
+      <input type="text" id="cmd" placeholder="команда…" autocomplete="off">
+    </div>
+    <div class="tools">
+      <button type="button" id="btn-scan">ИМИТАЦИЯ SECURITY SCAN</button>
+      <button type="button" id="btn-proj">ЗАПИСАТЬ ПРОЕКТ В ЛОКАЛЬНУЮ «КЛОН-РЕПУ»</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph">
+      <h1>ИИ · ГЕНЕРАЦИЯ КОДА / ОТЛАДКА</h1>
+      <p>Корпоративный системный промпт CRIMSONTEK. Опишите задачу — получите код или разбор ошибки.</p>
+    </div>
+    <div class="ai-box">
+      <textarea id="ai-q" placeholder="Пример: напиши функцию на Python для парсинга CSV с валидацией столбцов…"></textarea>
+      <button type="button" id="ai-go">ОТПРАВИТЬ В ИИ</button>
+      <div class="ai-out" id="ai-out"></div>
+    </div>
+  </div>
+  <a class="back" href="dashboard.html" style="grid-column:1/-1;">← HUB</a>
+
+  <script src="crimson-config.js"></script>
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('dev_hub'); } catch (e) {}
+
+    var term = document.getElementById('term');
+    function ln(t) { term.innerHTML += t + '\n'; term.scrollTop = term.scrollHeight; }
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+    ln('CRIMSONTEK DEV_SHELL v1 // введите help');
+
+    var PROJ_KEY = 'crimson_dev_projects_v1';
+
+    document.getElementById('cmd').addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var line = this.value.trim();
+      this.value = '';
+      if (!line) return;
+      ln('<span style="color:#ff6688">&gt;</span> ' + escapeHtml(line));
+      var low = line.toLowerCase();
+      if (low === 'help') {
+        ln('help clear ls status scan ai <текст>');
+        return;
+      }
+      if (low === 'clear') { term.innerHTML = ''; return; }
+      if (low === 'ls') {
+        var p = []; try { p = JSON.parse(localStorage.getItem(PROJ_KEY) || '[]'); } catch (x) {}
+        if (!p.length) ln('(нет записанных проектов)');
+        else p.forEach(function (x) { ln('  repo: ' + x.name + ' · ' + x.ts); });
+        return;
+      }
+      if (low === 'status') {
+        try {
+          var s = JSON.parse(localStorage.getItem('crimson_stats_v1') || '{}');
+          ln('hubVisits: ' + (s.hubVisits||0) + ' | aiQueries: ' + (s.aiQueries||0));
+        } catch (x) { ln('stats недоступны'); }
+        return;
+      }
+      if (low.indexOf('ai ') === 0) {
+        var q = line.slice(3).trim();
+        if (!q) { ln('usage: ai <запрос>'); return; }
+        runAiDev(q);
+        return;
+      }
+      ln('неизвестная команда — help');
+    });
+
+    function runAiDev(q) {
+      ln('… запрос к ИИ …');
+      crimsonAiChat([
+        { role: 'system', content: crimsonAiSystemPrompt('Ты старший разработчик CRIMSONTEK: код, рефакторинг, отладка, безопасность. Давай готовые фрагменты кода и чёткие шаги.') },
+        { role: 'user', content: q }
+      ]).then(function (text) {
+        ln(escapeHtml(text).replace(/\n/g, '<br>'));
+        if (typeof crimsonTrackAi === 'function') crimsonTrackAi();
+      }).catch(function (e) {
+        ln('ERROR: ' + escapeHtml(e.message || e));
+      });
+    }
+
+    document.getElementById('ai-go').onclick = function () {
+      var q = document.getElementById('ai-q').value.trim();
+      var out = document.getElementById('ai-out');
+      if (!q) return;
+      out.textContent = '…';
+      crimsonAiChat([
+        { role: 'system', content: crimsonAiSystemPrompt('Разработка ПО в CRIMSONTEK: код, тесты, пояснения. Язык ответа — русский; код — по задаче.') },
+        { role: 'user', content: q }
+      ]).then(function (text) {
+        out.textContent = text;
+        if (typeof crimsonTrackAi === 'function') crimsonTrackAi();
+      }).catch(function (e) {
+        out.textContent = e.code === 'NO_KEY' ? 'Нет API-ключа — задайте на HUB.' : String(e.message || e);
+      });
+    };
+
+    document.getElementById('btn-scan').onclick = function () {
+      var checks = ['TLS handshake … OK', 'CSP headers … смешанный режим', 'Зависимости CDN … проверка отпечатков', 'localStorage … сегмент оператора изолирован'];
+      checks.forEach(function (c, i) {
+        setTimeout(function () { ln('[scan] ' + c); }, i * 400);
+      });
+    };
+
+    document.getElementById('btn-proj').onclick = function () {
+      var name = prompt('Имя «репозитория» (локально):', 'ctk-module-alpha');
+      if (!name) return;
+      var list = []; try { list = JSON.parse(localStorage.getItem(PROJ_KEY) || '[]'); } catch (x) {}
+      list.push({ name: name, ts: new Date().toISOString() });
+      localStorage.setItem(PROJ_KEY, JSON.stringify(list));
+      ln('проект «' + escapeHtml(name) + '» записан в localStorage (аналог списка реп).');
+    };
+  </script>
+</body>
+</html>

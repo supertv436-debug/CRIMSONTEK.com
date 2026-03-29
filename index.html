@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <script>
+    (function () {
+      try {
+        var path = String(window.location.pathname || '').replace(/\\/g, '/');
+        var seg = path.split('/').filter(function (s) { return s.length; }).pop() || '';
+        try { seg = decodeURIComponent(seg); } catch (e) {}
+        var file = (seg || 'index.html').toLowerCase();
+        var pub = { 'operator_access.html': 1, 'login.html': 1, 'crimson_chat.html': 1 };
+        if (pub[file]) return;
+        var u = localStorage.getItem('c_user');
+        var p = localStorage.getItem('c_pass');
+        if (!u || !String(u).trim() || p == null || String(p) === '') {
+          window.location.replace('operator_access.html');
+        }
+      } catch (err) {
+        window.location.replace('operator_access.html');
+      }
+    })();
+    </script>
+    <script src="crimson-require-login.js"></script>
+    <noscript><meta http-equiv="refresh" content="0;url=operator_access.html"></noscript>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRIMSONTEK INDUSTRIES // ГЛАВНАЯ</title>
+    <link rel="stylesheet" href="crimson-theme.css">
+    <link rel="stylesheet" href="crimson-app-shell.css">
+    <style>
+        .feed { max-width: 720px; margin: 0 auto; padding: 16px 16px 72px; }
+        .post {
+            background: linear-gradient(135deg, rgba(14, 14, 14, 0.95) 0%, rgba(18, 6, 8, 0.9) 100%);
+            border: 1px solid rgba(255, 0, 51, 0.4);
+            border-left: 4px solid rgba(255, 0, 51, 0.55);
+            padding: 18px 20px;
+            margin-bottom: 14px;
+            box-shadow: var(--ct-glow-lg);
+            text-transform: none;
+        }
+        .post.pinned { border-left-color: var(--ct-flash); border-color: rgba(255, 26, 77, 0.55); }
+        .post h2 { margin: 0 0 10px 0; font-size: 1.02rem; color: var(--ct-flash); letter-spacing: 0.04em; }
+        .post .meta { font-size: 0.72rem; color: var(--ct-muted); margin-bottom: 12px; }
+        .post .body { color: var(--ct-text2); line-height: 1.55; font-size: 0.92rem; white-space: pre-wrap; }
+        .admin-panel {
+            margin-bottom: 20px; padding: 16px;
+            border: 1px dashed rgba(255, 0, 51, 0.5);
+            background: rgba(26, 0, 0, 0.35);
+            text-transform: none;
+        }
+        .admin-panel h3 { margin: 0 0 12px 0; font-size: 0.75rem; color: var(--ct-red); letter-spacing: 0.12em; }
+        .admin-panel input, .admin-panel textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 10px; background: var(--ct-bg); border: 1px solid var(--ct-red-dark); color: var(--ct-text); font-family: inherit; }
+        .admin-panel textarea { min-height: 100px; resize: vertical; }
+        .admin-panel button { padding: 10px 16px; margin-right: 8px; margin-top: 4px; background: var(--ct-red); color: #050505; border: none; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: var(--ct-glow); }
+        .admin-panel button.secondary { background: transparent; color: var(--ct-text2); border: 1px solid var(--ct-muted); box-shadow: none; }
+        .muted { color: var(--ct-muted); font-size: 0.82rem; text-transform: none; line-height: 1.45; margin-top: 8px; }
+    </style>
+</head>
+<body class="ct-shell">
+    <header class="ct-topbar">
+        <button type="button" class="ct-burger" aria-label="Меню"><span></span><span></span><span></span></button>
+        <h1 class="ct-topbar-title">CRIMSONTEK · НОВОСТИ</h1>
+    </header>
+    <div class="ct-drawer-overlay"></div>
+    <aside class="ct-drawer">
+        <div class="ct-drawer-header">
+            <p class="brand">CRIMSONTEK INDUSTRIES</p>
+            <p class="sub">Инженерная оболочка · публичная зона</p>
+        </div>
+        <nav>
+            <div class="drawer-h">ОПЕРАЦИОННЫЙ УРОВЕНЬ</div>
+            <a href="index.html">Главная — новости и брифинг</a>
+            <a href="profile.html">Профиль оператора</a>
+            <a href="operator_access.html">Регистрация / вход</a>
+            <div class="drawer-h">СИСТЕМА</div>
+            <a href="dashboard.html">COMMAND HUB</a>
+            <a href="workspaces_hub.html">WORKSPACES</a>
+            <a href="calc_hub.html">CALC HUB</a>
+            <a href="mechanisms_db.html">База механизмов</a>
+            <a href="media_wall.html">OFFICIAL MEDIA</a>
+            <a href="tech_chat.html">NET TERMINAL</a>
+        </nav>
+    </aside>
+
+    <main class="feed">
+        <div id="admin-ui" class="admin-panel" style="display:none;">
+            <h3>ПАНЕЛЬ АДМИНА — ПОСТ / ОБНОВЛЕНИЕ</h3>
+            <input type="text" id="ad-title" placeholder="Заголовок">
+            <textarea id="ad-body" placeholder="Текст новости, патч-ноуты, объявления…"></textarea>
+            <label style="font-size:0.75rem;color:var(--ct-text2);"><input type="checkbox" id="ad-pin"> Закрепить сверху</label>
+            <div style="margin-top:10px;">
+                <button type="button" id="ad-publish">ОПУБЛИКОВАТЬ</button>
+                <button type="button" class="secondary" id="ad-lock">ЗАКРЫТЬ ПАНЕЛЬ</button>
+            </div>
+        </div>
+        <div id="admin-login" class="admin-panel">
+            <h3>ВХОД АДМИНА (ПОСТЫ)</h3>
+            <input type="password" id="ad-secret" placeholder="Секрет владельца (CRIMSON_ADMIN_SECRET)" autocomplete="off">
+            <button type="button" id="ad-unlock">РАЗБЛОКИРОВАТЬ</button>
+            <p class="muted">Тот же ключ, что и для admin_media. Смените в crimson-config.js.</p>
+        </div>
+
+        <div id="feed-root"></div>
+    </main>
+
+    <nav class="ct-bottom-nav ct-bottom-nav--solo">
+        <a href="index.html" class="on">ГЛАВНАЯ</a>
+    </nav>
+
+    <script src="crimson-config.js"></script>
+    <script src="crimson-app-shell.js"></script>
+    <script>
+        const POSTS_KEY = 'crimson_site_posts_v1';
+        const ADMIN_SESS_KEY = 'crimson_admin_feed_unlock';
+
+        function loadPosts() {
+            try {
+                var a = JSON.parse(localStorage.getItem(POSTS_KEY) || '[]');
+                return Array.isArray(a) ? a : [];
+            } catch (e) { return []; }
+        }
+        function savePosts(a) {
+            localStorage.setItem(POSTS_KEY, JSON.stringify(a));
+        }
+        function seedIfEmpty() {
+            if (localStorage.getItem(POSTS_KEY) != null) return;
+            savePosts([{
+                id: 'seed-' + Date.now(),
+                title: 'Добро пожаловать в CRIMSONTEK OS',
+                body: 'Главная площадка CRIMSONTEK INDUSTRIES: официальные посты и обновления. Нижняя панель — возврат на главный экран. Меню («три линии») — профиль, вход оператора, COMMAND HUB и инженерные модули.',
+                date: new Date().toISOString(),
+                pinned: true
+            }]);
+        }
+
+        function adminUnlocked() {
+            var t = parseInt(sessionStorage.getItem(ADMIN_SESS_KEY) || '0', 10);
+            return t && (Date.now() - t < 8 * 60 * 60 * 1000);
+        }
+
+        function renderFeed() {
+            seedIfEmpty();
+            var posts = loadPosts();
+            posts.sort(function (a, b) {
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+                return new Date(b.date) - new Date(a.date);
+            });
+            var root = document.getElementById('feed-root');
+            root.innerHTML = '';
+            posts.forEach(function (p) {
+                var el = document.createElement('article');
+                el.className = 'post' + (p.pinned ? ' pinned' : '');
+                el.innerHTML =
+                  '<h2>' + esc(p.title) + '</h2>' +
+                  '<div class="meta">' + esc(fmt(p.date)) + (p.pinned ? ' · ЗАКРЕПЛЕНО' : '') + '</div>' +
+                  '<div class="body">' + esc(p.body) + '</div>';
+                root.appendChild(el);
+            });
+        }
+        function esc(s) {
+            return String(s == null ? '' : s)
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        function fmt(iso) {
+            try { return new Date(iso).toLocaleString('ru-RU'); } catch (e) { return iso; }
+        }
+
+        function syncAdminUi() {
+            var ok = adminUnlocked();
+            document.getElementById('admin-login').style.display = ok ? 'none' : 'block';
+            document.getElementById('admin-ui').style.display = ok ? 'block' : 'none';
+        }
+
+        document.getElementById('ad-unlock').onclick = function () {
+            var s = document.getElementById('ad-secret').value;
+            if (s === CRIMSON_ADMIN_SECRET) {
+                sessionStorage.setItem(ADMIN_SESS_KEY, String(Date.now()));
+                document.getElementById('ad-secret').value = '';
+                syncAdminUi();
+            } else {
+                alert('Неверный секрет');
+            }
+        };
+        document.getElementById('ad-lock').onclick = function () {
+            sessionStorage.removeItem(ADMIN_SESS_KEY);
+            syncAdminUi();
+        };
+        document.getElementById('ad-publish').onclick = function () {
+            var title = document.getElementById('ad-title').value.trim();
+            var body = document.getElementById('ad-body').value.trim();
+            if (!title || !body) { alert('Заголовок и текст обязательны'); return; }
+            var posts = loadPosts();
+            posts.push({
+                id: 'p-' + Date.now(),
+                title: title,
+                body: body,
+                date: new Date().toISOString(),
+                pinned: document.getElementById('ad-pin').checked
+            });
+            savePosts(posts);
+            document.getElementById('ad-title').value = '';
+            document.getElementById('ad-body').value = '';
+            document.getElementById('ad-pin').checked = false;
+            renderFeed();
+        };
+
+        syncAdminUi();
+        renderFeed();
+    </script>
+</body>
+</html>

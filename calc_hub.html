@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // CALC_HUB</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 14px; max-width: 800px; margin-left: auto; margin-right: auto; }
+    h1 { font-family: Orbitron, sans-serif; font-size: 1rem; color: var(--ct-red); letter-spacing: 0.15em; margin: 0 0 8px 0; }
+    p.lead { color: var(--ct-text2); font-size: 0.88rem; text-transform: none; margin: 0 0 18px 0; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    a.card {
+      display: block; padding: 16px; text-decoration: none; color: var(--ct-text);
+      background: var(--ct-bg2); border: 1px solid rgba(255, 0, 51, 0.4);
+      box-shadow: 0 0 14px rgba(255, 0, 51, 0.15);
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+    a.card:hover { border-color: var(--ct-flash); box-shadow: var(--ct-glow-lg); }
+    a.card strong { color: var(--ct-flash); display: block; margin-bottom: 6px; font-size: 0.85rem; letter-spacing: 0.08em; }
+    a.card span { font-size: 0.8rem; color: var(--ct-text2); text-transform: none; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>ИНЖЕНЕРНЫЕ РАСЧЁТЫ · CRIMSONTEK</h1>
+  <p class="lead">Инженерный центр: расчёты, справочник, просмотр STL, демонстрация кулачкового механизма и печать отчёта. Жесты в 3D — <a href="spatial_studio.html" style="color:var(--ct-neon-soft);">SPATIAL_STUDIO</a>; рельеф с фото — <a href="part_photo_3d.html" style="color:var(--ct-neon-soft);">PHOTO→3D</a>. Роли и хабы — <a href="workspaces_hub.html" style="color:var(--ct-neon-soft);">WORKSPACES</a>.</p>
+  <div class="grid">
+    <a href="mechanisms_db.html" class="card" onclick="try{crimsonTrackModule('mechanisms_db')}catch(e){}">
+      <strong>БАЗА МЕХАНИЗМОВ</strong>
+      <span>Кулачки, зубчатые, рычаги, ремни, дифференциалы — с поиском и ссылкой на MECH_DEMO.</span>
+    </a>
+    <a href="calc_stress.html" class="card" onclick="try{crimsonTrackModule('calc_stress')}catch(e){}">
+      <strong>НАПРЯЖЕНИЯ · ИЗГИБ</strong>
+      <span>σ = M / W — проверка по заданным моменту и модулю сопротивления.</span>
+    </a>
+    <a href="calc_hydro.html" class="card" onclick="try{crimsonTrackModule('calc_hydro')}catch(e){}">
+      <strong>ГИДРАВЛИКА · РАСХОД</strong>
+      <span>Q = v·A — объёмный расход по скорости и площади сечения.</span>
+    </a>
+    <a href="materials_db.html" class="card" onclick="try{crimsonTrackModule('materials')}catch(e){}">
+      <strong>БАЗА МАТЕРИАЛОВ</strong>
+      <span>Стали, сплавы: σ, E, ρ — справочно.</span>
+    </a>
+    <a href="cad_viewer.html" class="card" onclick="try{crimsonTrackModule('cad_viewer')}catch(e){}">
+      <strong>CAD · STL VIEWER</strong>
+      <span>Загрузка STL в браузере (Three.js). DWG/STEP — конвертируйте снаружи.</span>
+    </a>
+    <a href="mech_demo.html" class="card" onclick="try{crimsonTrackModule('mech_demo')}catch(e){}">
+      <strong>МЕХАНИЗМЫ · КУЛАЧОК</strong>
+      <span>Анимация дискового кулачка: s(φ), скорость и ускорение на графике.</span>
+    </a>
+    <a href="calc_report.html" class="card" onclick="try{crimsonTrackModule('calc_report')}catch(e){}">
+      <strong>ОТЧЁТ · PDF</strong>
+      <span>Инженерный лист с полями; сохранение через «Печать» браузера в PDF.</span>
+    </a>
+  </div>
+  <p style="margin-top:24px;"><a href="dashboard.html" style="color:var(--ct-neon-soft);">← HUB</a></p>
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+  </script>
+</body>
+</html>

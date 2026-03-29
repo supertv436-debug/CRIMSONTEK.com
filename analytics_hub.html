@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // ANALYTICS_HUB</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 16px; max-width: 1100px; margin-left: auto; margin-right: auto; text-transform: none; }
+    h1 { font-size: 0.9rem; color: var(--ct-red); letter-spacing: 0.1em; margin: 0 0 8px 0; }
+    .lead { color: var(--ct-text2); font-size: 0.86rem; line-height: 1.5; margin-bottom: 16px; }
+    .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+    button.ct { padding: 10px 16px; background: var(--ct-red); color: #050505; border: none; font-weight: 700; cursor: pointer; box-shadow: var(--ct-glow); font-family: inherit; }
+    #tbl-wrap { overflow-x: auto; max-height: 220px; border: 1px solid rgba(255,0,51,0.35); margin: 12px 0; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+    th, td { border: 1px solid var(--ct-bg3); padding: 6px 10px; text-align: left; }
+    th { background: var(--ct-bg2); color: var(--ct-flash); }
+    #chart-wrap { max-width: 100%; height: 320px; margin: 16px 0; }
+    .ai-box { margin-top: 20px; padding: 14px; background: var(--ct-bg2); border: 1px solid rgba(255,0,51,0.3); }
+    .ai-box textarea { width: 100%; min-height: 70px; box-sizing: border-box; background: var(--ct-bg); border: 1px solid var(--ct-red-dark); color: var(--ct-text); padding: 10px; font-family: inherit; }
+    .ai-box button { margin-top: 8px; }
+    .out { margin-top: 10px; padding: 10px; background: var(--ct-bg); color: var(--ct-text); font-size: 0.84rem; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+    a.back { color: var(--ct-neon-soft); display: inline-block; margin-top: 20px; font-size: 0.85rem; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <h1>ANALYTICS_HUB · ТАБЛИЦЫ И ГРАФИКИ</h1>
+  <p class="lead">Импорт <strong>CSV</strong> (Excel: «Сохранить как CSV»). Числовые столбцы строятся на графике. Простой линейный прогноз на 3 шага — по последним точкам. Расширенный смысл — через ИИ CRIMSONTEK.</p>
+
+  <div class="bar">
+    <input type="file" id="csv" accept=".csv,text/csv">
+    <label style="color:var(--ct-text2);font-size:0.82rem;">Числовой столбец (индекс с 0)</label>
+    <input type="number" id="col-idx" value="1" min="0" step="1" style="width:60px;padding:8px;background:var(--ct-bg2);border:1px solid var(--ct-red-dark);color:var(--ct-text);">
+    <button type="button" class="ct" id="btn-chart">ОБНОВИТЬ ГРАФИК</button>
+  </div>
+  <div id="tbl-wrap"><table id="data"></table></div>
+  <div id="chart-wrap"><canvas id="ch"></canvas></div>
+  <p id="forecast" style="color:var(--ct-neon-soft);font-size:0.88rem;"></p>
+
+  <div class="ai-box">
+    <strong style="color:var(--ct-flash);font-size:0.75rem;letter-spacing:0.1em;">ИИ-ПРОГНОЗ / ИНТЕРПРЕТАЦИЯ</strong>
+    <p style="font-size:0.8rem;color:var(--ct-text2);margin:8px 0;">Вставьте несколько чисел через запятую или опишите ряд — модель ответит как аналитик CRIMSONTEK.</p>
+    <textarea id="ai-data" placeholder="12, 15, 14, 18, 22 или текстовое описание метрик…"></textarea>
+    <button type="button" class="ct" id="ai-run">СПРОСИТЬ ИИ</button>
+    <div class="out" id="ai-out"></div>
+  </div>
+
+  <a class="back" href="dashboard.html">← HUB</a>
+
+  <script src="crimson-config.js"></script>
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('analytics_hub'); } catch (e) {}
+
+    var rows = [];
+    var chart;
+
+    function parseCSV(text) {
+      var lines = text.trim().split(/\r?\n/);
+      return lines.map(function (line) {
+        var out = []; var cur = ''; var q = false;
+        for (var i = 0; i < line.length; i++) {
+          var c = line[i];
+          if (c === '"') { q = !q; continue; }
+          if (!q && c === ',') { out.push(cur); cur = ''; continue; }
+          cur += c;
+        }
+        out.push(cur);
+        return out;
+      });
+    }
+
+    document.getElementById('csv').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        rows = parseCSV(r.result);
+        renderTable();
+        document.getElementById('btn-chart').click();
+      };
+      r.readAsText(f, 'UTF-8');
+    });
+
+    function renderTable() {
+      var t = document.getElementById('data');
+      t.innerHTML = '';
+      rows.forEach(function (row, i) {
+        var tr = document.createElement('tr');
+        row.forEach(function (cell) {
+          var td = document.createElement(i === 0 ? 'th' : 'td');
+          td.textContent = cell;
+          tr.appendChild(td);
+        });
+        t.appendChild(tr);
+      });
+    }
+
+    function colNumbers(idx) {
+      var nums = [];
+      for (var i = 1; i < rows.length; i++) {
+        var v = parseFloat(String(rows[i][idx]).replace(',', '.'));
+        if (!isNaN(v)) nums.push(v);
+      }
+      return nums;
+    }
+
+    document.getElementById('btn-chart').onclick = function () {
+      if (rows.length < 2) { alert('Загрузите CSV'); return; }
+      var idx = parseInt(document.getElementById('col-idx').value, 10) || 0;
+      var y = colNumbers(idx);
+      if (y.length < 2) { alert('Нет числовых данных в столбце'); return; }
+      var labels = y.map(function (_, i) { return String(i + 1); });
+      var x = y.map(function (_, i) { return i + 1; });
+      var n = x.length;
+      var sx = x.reduce(function (a,b) { return a+b; }, 0);
+      var sy = y.reduce(function (a,b) { return a+b; }, 0);
+      var sxx = x.reduce(function (a,t) { return a+t*t; }, 0);
+      var sxy = x.reduce(function (a,t,i) { return a + t * y[i]; }, 0);
+      var slope = (n * sxy - sx * sy) / (n * sxx - sx * sx + 1e-9);
+      var inter = (sy - slope * sx) / n;
+      var fut = [];
+      for (var k = 1; k <= 3; k++) fut.push(inter + slope * (n + k));
+      document.getElementById('forecast').textContent =
+        'Линейный тренд (OLS): наклон ≈ ' + slope.toFixed(4) + ' · прогноз следующих 3 точек: ' + fut.map(function (v) { return v.toFixed(3); }).join(', ');
+
+      var ctx = document.getElementById('ch');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.concat(['+1','+2','+3']),
+          datasets: [{
+            label: 'Ряд',
+            data: y.concat(fut),
+            borderColor: '#ff0033',
+            tension: 0.15
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#ccc' } } },
+          scales: {
+            x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,0,51,0.1)' } },
+            y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,0,51,0.1)' } }
+          }
+        }
+      });
+    };
+
+    document.getElementById('ai-run').onclick = function () {
+      var raw = document.getElementById('ai-data').value.trim();
+      var out = document.getElementById('ai-out');
+      if (!raw) return;
+      out.textContent = '…';
+      crimsonAiChat([
+        { role: 'system', content: crimsonAiSystemPrompt('Ты аналитик CRIMSONTEK: временные ряды, KPI, осторожные прогнозы. Ясно разделяй факты и гипотезы.') },
+        { role: 'user', content: 'Данные / описание для анализа:\n' + raw }
+      ]).then(function (t) {
+        out.textContent = t;
+        if (typeof crimsonTrackAi === 'function') crimsonTrackAi();
+      }).catch(function (e) {
+        out.textContent = e.code === 'NO_KEY' ? 'Нет ключа API — HUB.' : String(e.message || e);
+      });
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRIMSONTEK // ДОСТУП ОПЕРАТОРА</title>
+    <link rel="stylesheet" href="crimson-theme.css">
+    <link rel="stylesheet" href="crimson-app-shell.css">
+    <style>
+        .wrap { max-width: 420px; margin: 0 auto; padding: 16px 16px 72px; }
+        .login-box {
+            border: 2px solid var(--ct-red);
+            padding: 24px;
+            background: var(--ct-bg2);
+            box-shadow: var(--ct-glow-lg);
+            text-align: center;
+        }
+        .tabs { display: flex; margin-bottom: 18px; border: 1px solid rgba(255, 0, 51, 0.35); }
+        .tabs button {
+            flex: 1; padding: 12px; background: var(--ct-bg); color: var(--ct-muted); border: none;
+            font-family: inherit; font-weight: bold; cursor: pointer; font-size: 0.78rem; text-transform: uppercase;
+        }
+        .tabs button.on { background: var(--ct-organic); color: var(--ct-flash); box-shadow: inset 0 0 20px rgba(255, 0, 51, 0.15); }
+        input {
+            background: var(--ct-bg); border: 1px solid var(--ct-red-dark); color: var(--ct-text); padding: 14px; width: 100%; margin-bottom: 12px;
+            outline: none; box-sizing: border-box; font-family: inherit; font-size: 1rem;
+        }
+        .hint { font-size: 0.72rem; color: var(--ct-text2); text-align: left; margin: -8px 0 12px 0; text-transform: none; line-height: 1.4; }
+        .go { background: var(--ct-red); color: #050505; border: none; padding: 14px; width: 100%; font-weight: bold; cursor: pointer; font-family: inherit; text-transform: uppercase; font-size: 0.9rem; box-shadow: var(--ct-glow); }
+        .go-sec { background: var(--ct-organic); color: var(--ct-flash); border: 1px solid var(--ct-red); margin-top: 10px; box-shadow: none; }
+        .sub { margin-top: 14px; font-size: 0.72rem; color: var(--ct-muted); text-transform: none; }
+        #otp-row { display: none; text-align: left; }
+        #otp-row.on { display: block; }
+        #otp-demo {
+            background: var(--ct-organic); border: 1px solid var(--ct-flash); padding: 12px; margin: 12px 0;
+            font-family: ui-monospace, monospace; font-size: 1.1rem; color: var(--ct-flash); text-align: center;
+        }
+    </style>
+</head>
+<body class="ct-shell">
+    <header class="ct-topbar">
+        <button type="button" class="ct-burger" aria-label="Меню" title="Меню"><span></span><span></span><span></span></button>
+        <h1 class="ct-topbar-title">Доступ оператора</h1>
+    </header>
+    <div class="ct-drawer-overlay"></div>
+    <aside class="ct-drawer">
+        <div class="ct-drawer-header">
+            <p class="brand">CRIMSONTEK INDUSTRIES</p>
+            <p class="sub">Идентификация оператора</p>
+        </div>
+        <nav>
+            <div class="drawer-h">ОПЕРАЦИОННЫЙ УРОВЕНЬ</div>
+            <a href="index.html">Главная — брифинг</a>
+            <a href="profile.html">Профиль оператора</a>
+            <a href="operator_access.html">Доступ оператора</a>
+            <div class="drawer-h">СИСТЕМА</div>
+            <a href="dashboard.html">COMMAND HUB</a>
+            <a href="workspaces_hub.html">WORKSPACES</a>
+            <a href="calc_hub.html">CALC HUB</a>
+        </nav>
+    </aside>
+
+    <div class="wrap">
+        <div id="active-sess" class="login-box" style="display:none;margin-bottom:14px;border-color:rgba(0,255,200,0.35);">
+            <p style="margin:0 0 8px 0;font-size:0.75rem;color:var(--ct-text2);text-transform:none;">В этом браузере уже сохранена сессия (вы могли не нажимать «вход» в этой вкладке — данные остались с прошлого раза):</p>
+            <p id="active-sess-user" style="margin:0 0 12px 0;color:var(--ct-flash);font-weight:700;font-size:0.9rem;"></p>
+            <a href="index.html" class="go" style="display:block;text-decoration:none;text-align:center;">ОТКРЫТЬ ГЛАВНУЮ</a>
+            <button type="button" class="go-sec" id="btn-sess-out" style="width:100%;margin-top:10px;">ВЫЙТИ · СБРОСИТЬ СЕССИЮ</button>
+        </div>
+        <div class="login-box">
+            <h2 style="margin:0 0 6px 0;font-size:14px;letter-spacing:3px;color:var(--ct-flash);">GHOST-LINK // ACCESS</h2>
+            <p style="margin:0 0 14px 0;font-size:0.65rem;letter-spacing:0.2em;color:var(--ct-text2);">CRIMSONTEK INDUSTRIES</p>
+            <div class="tabs" id="tabs">
+                <button type="button" class="on" data-mode="reg">РЕГИСТРАЦИЯ</button>
+                <button type="button" data-mode="login">ВХОД</button>
+            </div>
+
+            <input type="text" id="user" placeholder="ЛОГИН (OPERATOR_ID)" autocomplete="username">
+            <input type="password" id="pass" placeholder="ПАРОЛЬ" autocomplete="current-password">
+
+            <div id="reg-extra">
+                <input type="tel" id="phone" placeholder="ТЕЛЕФОН (+7 или 8...)" autocomplete="tel">
+                <p class="hint">Один номер — одна учётная запись (на этом устройстве / в этом браузере). Код подтверждения: экран + Telegram админу. Реальная SMS только через ваш сервер (см. CRIMSON_OTP.endpoint в конфиге).</p>
+                <button type="button" class="go go-sec" id="btn-otp">ПОЛУЧИТЬ КОД</button>
+                <div id="otp-row">
+                    <label class="hint" style="margin-top:14px;">Код из SMS / экрана</label>
+                    <div id="otp-demo" style="display:none;"></div>
+                    <input type="text" id="otp" placeholder="6 цифр" autocomplete="one-time-code" maxlength="12">
+                    <button type="button" class="go" id="btn-reg-finish">ЗАВЕРШИТЬ РЕГИСТРАЦИЮ</button>
+                </div>
+            </div>
+
+            <button type="button" class="go" id="btn-submit-login" style="display:none;">ПОДТВЕРДИТЬ ВХОД</button>
+            <p class="sub">Пока вы не зарегистрируетесь или не войдёте под своим логином, остальной сайт открыть нельзя — после успешного входа сессия сохраняется в этом браузере (localStorage).</p>
+        </div>
+    </div>
+
+    <nav class="ct-bottom-nav ct-bottom-nav--solo">
+        <a href="index.html">ГЛАВНАЯ</a>
+    </nav>
+
+    <script src="crimson-config.js"></script>
+    <script src="crimson-app-shell.js"></script>
+    <script>
+        (function () {
+            var u = localStorage.getItem('c_user');
+            var p = localStorage.getItem('c_pass');
+            if (!u || p == null || !String(u).trim() || String(p) === '') return;
+            var box = document.getElementById('active-sess');
+            var lab = document.getElementById('active-sess-user');
+            if (box && lab) {
+                box.style.display = 'block';
+                lab.textContent = 'OPERATOR_ID: ' + u;
+            }
+            var btn = document.getElementById('btn-sess-out');
+            if (btn) {
+                btn.onclick = function () {
+                    try {
+                        localStorage.removeItem('c_user');
+                        localStorage.removeItem('c_pass');
+                        localStorage.removeItem('c_verified');
+                        localStorage.removeItem('crimson_phone');
+                        localStorage.removeItem('c_role');
+                        localStorage.removeItem('crimson_ai_key');
+                        localStorage.removeItem('crimson_admin_feed_unlock');
+                    } catch (e) {}
+                    location.reload();
+                };
+            }
+        })();
+        const PENDING_KEY = 'crimson_pending_reg_otp';
+
+        let mode = 'reg';
+
+        document.getElementById('tabs').addEventListener('click', function (e) {
+            const b = e.target.closest('button[data-mode]');
+            if (!b) return;
+            mode = b.getAttribute('data-mode');
+            document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+            document.getElementById('reg-extra').style.display = mode === 'reg' ? 'block' : 'none';
+            document.getElementById('btn-submit-login').style.display = mode === 'login' ? 'block' : 'none';
+            document.getElementById('otp-row').classList.remove('on');
+        });
+
+        document.getElementById('btn-otp').onclick = async function () {
+            const u = document.getElementById('user').value.trim();
+            const p = document.getElementById('pass').value;
+            const phoneRaw = document.getElementById('phone').value.trim();
+            if (!u || !p) { alert('УКАЖИТЕ ЛОГИН И ПАРОЛЬ'); return; }
+            if (!phoneRaw) { alert('УКАЖИТЕ ТЕЛЕФОН'); return; }
+            const phone = crimsonNormalizePhone(phoneRaw);
+            const owner = crimsonPhoneOwner(phone);
+            if (owner && owner !== u) {
+                alert('ЭТОТ НОМЕР УЖЕ ПРИВЯЗАН К ЛОГИНУ: ' + owner);
+                return;
+            }
+            if (owner === u) {
+                alert('Номер уже подтверждён за этим логином — используйте «Вход».');
+                return;
+            }
+            const code = crimsonGenerateOtpCode();
+            const ttl = (CRIMSON_OTP && CRIMSON_OTP.ttlMs) || 600000;
+            sessionStorage.setItem(PENDING_KEY, JSON.stringify({
+                phone: phone, user: u, pass: p, code: code, exp: Date.now() + ttl
+            }));
+            await crimsonDeliverOtp(phone, code);
+            document.getElementById('otp-row').classList.add('on');
+            const demo = document.getElementById('otp-demo');
+            if (CRIMSON_OTP && CRIMSON_OTP.demoShowCode !== false) {
+                demo.style.display = 'block';
+                demo.textContent = 'Код: ' + code;
+            } else {
+                demo.style.display = 'none';
+            }
+        };
+
+        document.getElementById('btn-reg-finish').onclick = function () {
+            const raw = sessionStorage.getItem(PENDING_KEY);
+            if (!raw) { alert('Сначала запросите код.'); return; }
+            let d;
+            try { d = JSON.parse(raw); } catch (e) { alert('Сессия кода сброшена.'); return; }
+            if (Date.now() > d.exp) { alert('Код истёк. Запросите новый.'); sessionStorage.removeItem(PENDING_KEY); return; }
+            const entered = document.getElementById('otp').value.replace(/\D/g, '');
+            if (entered !== d.code) { alert('НЕВЕРНЫЙ КОД'); return; }
+            const phone = crimsonNormalizePhone(d.phone);
+            const existing = crimsonPhoneOwner(phone);
+            if (existing && existing !== d.user) {
+                alert('Номер занят другим логином.');
+                return;
+            }
+            if (!crimsonPhoneRegistryAdd(phone, d.user)) {
+                if (crimsonPhoneOwner(phone) !== d.user) {
+                    alert('НЕ УДАЛОСЬ ЗАПИСАТЬ РЕЕСТР');
+                    return;
+                }
+            }
+            localStorage.setItem('c_user', d.user);
+            localStorage.setItem('c_pass', d.pass);
+            localStorage.setItem('crimson_phone', phone);
+            localStorage.setItem('c_verified', 'false');
+            sessionStorage.removeItem(PENDING_KEY);
+            const msg = crimsonFormatDossier('🔐 CRIMSONTEK — РЕГИСТРАЦИЯ (OTP OK)', {
+                login: d.user,
+                phone: phone,
+                event: 'НОВАЯ УЧЁТНАЯ ЗАПИСЬ',
+                note: 'Ожидается BIO_SCAN.'
+            });
+            crimsonSendTelegramHtml(msg);
+            window.location.href = 'bio_scan.html';
+        };
+
+        document.getElementById('btn-submit-login').onclick = function () {
+            const u = document.getElementById('user').value.trim();
+            const p = document.getElementById('pass').value;
+            if (!u || !p) { alert('УКАЖИТЕ ЛОГИН И ПАРОЛЬ'); return; }
+            if (u !== localStorage.getItem('c_user') || p !== localStorage.getItem('c_pass')) {
+                alert('ОШИБКА: НЕВЕРНЫЙ ЛОГИН ИЛИ ПАРОЛЬ');
+                return;
+            }
+            const msgIn = crimsonFormatDossier('✅ CRIMSONTEK — ВХОД В СИСТЕМУ', {
+                login: u,
+                phone: localStorage.getItem('crimson_phone') || '—',
+                event: 'АВТОРИЗАЦИЯ',
+                note: localStorage.getItem('c_verified') === 'true' ? 'Верифицирован ранее.' : 'Требуется биометрия.'
+            });
+            crimsonSendTelegramHtml(msgIn);
+            var ph = localStorage.getItem('crimson_phone');
+            if (ph && typeof crimsonPhoneOwner === 'function' && !crimsonPhoneOwner(ph)) {
+                crimsonPhoneRegistryAdd(ph, u);
+            }
+            if (localStorage.getItem('c_verified') === 'true') {
+                window.location.href = 'dashboard.html';
+            } else {
+                window.location.href = 'bio_scan.html';
+            }
+        };
+    </script>
+</body>
+</html>

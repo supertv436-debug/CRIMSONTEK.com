@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // CHEM_HUB</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 16px; max-width: 960px; margin-left: auto; margin-right: auto; text-transform: none; font-size: 0.88rem; }
+    h1 { font-size: 0.9rem; color: var(--ct-red); letter-spacing: 0.1em; }
+    .tabs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 16px; }
+    .card { background: var(--ct-bg2); border: 1px solid rgba(255,0,51,0.35); padding: 14px; box-shadow: var(--ct-glow-lg); }
+    .card h2 { margin: 0 0 10px 0; font-size: 0.74rem; color: var(--ct-flash); letter-spacing: 0.1em; }
+    label { display: block; color: var(--ct-text2); font-size: 0.78rem; margin-top: 8px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; background: var(--ct-bg); border: 1px solid var(--ct-red-dark); color: var(--ct-text); font-family: inherit; }
+    button.ct { margin-top: 10px; padding: 10px 14px; background: var(--ct-red); color: #050505; border: none; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: var(--ct-glow); }
+    pre.out { background: var(--ct-bg); padding: 10px; border: 1px solid var(--ct-bg3); color: var(--ct-neon-soft); font-size: 0.86rem; margin-top: 10px; white-space: pre-wrap; }
+    table.rx { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 10px; }
+    table.rx th, table.rx td { border: 1px solid var(--ct-bg3); padding: 8px; text-align: left; }
+    #cv { width: 100%; max-width: 640px; height: 200px; border: 1px solid rgba(255,0,51,0.35); display: block; margin: 12px 0; background: var(--ct-bg); }
+    textarea { width: 100%; min-height: 80px; box-sizing: border-box; background: var(--ct-bg); border: 1px solid var(--ct-red-dark); color: var(--ct-text); padding: 10px; font-family: inherit; }
+    a.back { color: var(--ct-neon-soft); display: inline-block; margin-top: 20px; }
+    select { width: 100%; padding: 8px; margin-top: 4px; background: var(--ct-bg2); border: 1px solid var(--ct-red-dark); color: var(--ct-text); }
+  </style>
+</head>
+<body>
+  <h1>CHEM_HUB · ХИМИЯ И РАСЧЁТЫ</h1>
+  <p style="color:var(--ct-text2);line-height:1.5;">Модуль для учёбы и лабораторных заметок: молярность, pH, справочник реакций, график разбавления. Структуры веществ — формульный уровень + ИИ для пояснений.</p>
+
+  <div class="tabs">
+    <div class="card">
+      <h2>МОЛЯРНОСТЬ</h2>
+      <label>Масса вещества, г</label><input type="number" id="mol-m" step="any" value="4.0">
+      <label>Молярная масса Mr, г/моль</label><input type="number" id="mol-mr" step="any" value="40">
+      <label>Объём раствора, л</label><input type="number" id="mol-v" step="any" value="0.5">
+      <button type="button" class="ct" id="btn-mol">C = n / V</button>
+      <pre class="out" id="out-mol"></pre>
+    </div>
+    <div class="card">
+      <h2>pH</h2>
+      <label>[H⁺], моль/л (напр. 1e-4)</label><input type="text" id="ph-h" value="0.0001">
+      <button type="button" class="ct" id="btn-ph">РАССЧИТАТЬ pH</button>
+      <pre class="out" id="out-ph"></pre>
+      <label>pOH / [OH⁻] оценка</label><input type="text" id="ph-oh" placeholder="опционально [OH⁻]">
+      <button type="button" class="ct" id="btn-poh">pOH</button>
+      <pre class="out" id="out-poh"></pre>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2>РАЗБАВЛЕНИЕ C₁V₁ = C₂V₂</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div><label>C1 моль/л</label><input type="number" id="d-c1" step="any" value="1"></div>
+      <div><label>V1 мл (исходный)</label><input type="number" id="d-v1" step="any" value="10"></div>
+      <div><label>V2 мл (итоговый объём)</label><input type="number" id="d-v2" step="any" value="100"></div>
+    </div>
+    <button type="button" class="ct" id="btn-dil">Рассчитать C2</button>
+    <canvas id="cv"></canvas>
+    <pre class="out" id="out-dil"></pre>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2>БАЗА РЕАКЦИЙ (СЖАТЫЙ СПРАВОЧНИК)</h2>
+    <label>Категория</label>
+    <select id="rx-cat"></select>
+    <table class="rx" id="rx-tb"></table>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2>ИИ · ЗАДАЧА С ОБЪЯСНЕНИЕМ</h2>
+    <textarea id="chem-q" placeholder="Опишите задачу по химии…"></textarea>
+    <button type="button" class="ct" id="chem-ai">РЕШИТЬ / ОБЪЯСНИТЬ</button>
+    <pre class="out" id="chem-ai-out"></pre>
+  </div>
+
+  <a class="back" href="dashboard.html">← HUB</a>
+
+  <script src="crimson-config.js"></script>
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('chem_hub'); } catch (e) {}
+
+    document.getElementById('btn-mol').onclick = function () {
+      var m = parseFloat(document.getElementById('mol-m').value);
+      var mr = parseFloat(document.getElementById('mol-mr').value);
+      var v = parseFloat(document.getElementById('mol-v').value);
+      var n = m / mr;
+      var c = n / v;
+      document.getElementById('out-mol').textContent =
+        'n = m/Mr = ' + n.toFixed(6) + ' моль\nC = n/V = ' + c.toFixed(6) + ' моль/л';
+    };
+
+    document.getElementById('btn-ph').onclick = function () {
+      var h = parseFloat(document.getElementById('ph-h').value);
+      if (!(h > 0)) { document.getElementById('out-ph').textContent = 'Введите [H⁺] > 0'; return; }
+      var ph = -Math.log10(h);
+      document.getElementById('out-ph').textContent = 'pH = -lg[H⁺] ≈ ' + ph.toFixed(3);
+    };
+
+    document.getElementById('btn-poh').onclick = function () {
+      var t = document.getElementById('ph-oh').value.trim();
+      if (!t) { document.getElementById('out-poh').textContent = 'Введите [OH⁻]'; return; }
+      var oh = parseFloat(t);
+      if (!(oh > 0)) return;
+      var poh = -Math.log10(oh);
+      var pkw = 14;
+      document.getElementById('out-poh').textContent = 'pOH ≈ ' + poh.toFixed(3) + ' · при 25°C pH ≈ ' + (pkw - poh).toFixed(3);
+    };
+
+    document.getElementById('btn-dil').onclick = function () {
+      var c1 = parseFloat(document.getElementById('d-c1').value);
+      var v1 = parseFloat(document.getElementById('d-v1').value);
+      var v2 = parseFloat(document.getElementById('d-v2').value);
+      var c2 = c1 * v1 / v2;
+      document.getElementById('out-dil').textContent = 'C2 = C1·V1/V2 = ' + c2.toFixed(6) + ' моль/л при V в одних единицах (мл).';
+      var cv = document.getElementById('cv');
+      var ctx = cv.getContext('2d');
+      cv.width = Math.min(640, cv.clientWidth || 640);
+      cv.height = 200;
+      ctx.fillStyle = '#0b0b0b';
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.strokeStyle = 'rgba(255,0,51,0.4)';
+      ctx.beginPath();
+      ctx.moveTo(40, cv.height - 30);
+      ctx.lineTo(cv.width - 20, cv.height - 30);
+      ctx.moveTo(40, 20);
+      ctx.lineTo(40, cv.height - 30);
+      ctx.stroke();
+      var steps = 20;
+      ctx.strokeStyle = '#ff6688';
+      ctx.beginPath();
+      for (var i = 0; i <= steps; i++) {
+        var vx = v1 + (v2 - v1) * (i / steps);
+        var cc = c1 * v1 / vx;
+        var x = 40 + (cv.width - 60) * (i / steps);
+        var y = cv.height - 30 - (cc / c1) * (cv.height - 60);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.fillStyle = '#aaa';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('C от объёма (линия разбавления)', 50, 18);
+    };
+
+    var RX = [
+      { cat: 'Кислоты / основания', eq: 'HCl + NaOH → NaCl + H₂O', note: 'Нейтрализация сильная' },
+      { cat: 'Кислоты / основания', eq: 'CH₃COOH ⇌ CH₃COO⁻ + H⁺', note: 'Слабая кислота, Kₐ' },
+      { cat: 'Окисление', eq: '2Mg + O₂ → 2MgO', note: 'Горение магния' },
+      { cat: 'Окисление', eq: 'Zn + CuSO₄ → ZnSO₄ + Cu', note: 'Вытеснение металла' },
+      { cat: 'Органика', eq: 'CH₄ + 2O₂ → CO₂ + 2H₂O', note: 'Сжигание метана' },
+      { cat: 'Органика', eq: 'C₂H₄ + H₂ → C₂H₆', note: 'Гидрирование (катализ)' },
+      { cat: 'Растворы', eq: 'n = C·V', note: 'Связь моль/л и литров' }
+    ];
+    var cats = {};
+    RX.forEach(function (r) { cats[r.cat] = true; });
+    var sel = document.getElementById('rx-cat');
+    Object.keys(cats).forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c;
+      o.textContent = c;
+      sel.appendChild(o);
+    });
+    function renderRx() {
+      var c = sel.value;
+      var tb = document.getElementById('rx-tb');
+      tb.innerHTML = '<tr><th>Уравнение</th><th>Комментарий</th></tr>';
+      RX.filter(function (x) { return x.cat === c; }).forEach(function (r) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + r.eq + '</td><td>' + r.note + '</td>';
+        tb.appendChild(tr);
+      });
+    }
+    sel.onchange = renderRx;
+    renderRx();
+
+    document.getElementById('chem-ai').onclick = function () {
+      var q = document.getElementById('chem-q').value.trim();
+      var out = document.getElementById('chem-ai-out');
+      if (!q) return;
+      out.textContent = '…';
+      crimsonAiChat([
+        { role: 'system', content: crimsonAiSystemPrompt('Ты химик-консультант CRIMSONTEK: стехиометрия, растворы, pH, основы ОВЭ. Решай задачи пошагово, обозначай допущения (25°C, идеальный раствор) если нужно.') },
+        { role: 'user', content: q }
+      ]).then(function (t) {
+        out.textContent = t;
+        if (typeof crimsonTrackAi === 'function') crimsonTrackAi();
+      }).catch(function (e) {
+        out.textContent = e.code === 'NO_KEY' ? 'Нет ключа — HUB.' : String(e.message || e);
+      });
+    };
+  </script>
+</body>
+</html>

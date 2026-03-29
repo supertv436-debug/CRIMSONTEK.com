@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // MECHANISMS_DB</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 16px; max-width: 1000px; margin-left: auto; margin-right: auto; text-transform: none; }
+    h1 { font-size: 0.92rem; color: var(--ct-red); letter-spacing: 0.1em; margin: 0 0 8px 0; }
+    .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 14px 0; }
+    input[type="search"] { flex: 1; min-width: 200px; padding: 10px; background: var(--ct-bg2); border: 1px solid var(--ct-red-dark); color: var(--ct-text); font-family: inherit; }
+    select { padding: 10px; background: var(--ct-bg2); border: 1px solid var(--ct-red-dark); color: var(--ct-text); font-family: inherit; min-width: 220px; }
+    .list { display: grid; gap: 12px; margin-top: 16px; }
+    article {
+      background: var(--ct-bg2);
+      border: 1px solid rgba(255,0,51,0.35);
+      padding: 14px 16px;
+      box-shadow: 0 0 12px rgba(255,0,51,0.08);
+    }
+    article h2 { margin: 0 0 8px 0; font-size: 0.88rem; color: var(--ct-flash); }
+    article .meta { font-size: 0.72rem; color: var(--ct-muted); letter-spacing: 0.08em; margin-bottom: 8px; }
+    article p { margin: 0; font-size: 0.86rem; color: var(--ct-text2); line-height: 1.55; }
+    article .eq { font-family: ui-monospace, monospace; color: var(--ct-neon-soft); margin-top: 10px; font-size: 0.82rem; }
+    article a { color: var(--ct-flash); font-size: 0.78rem; display: inline-block; margin-top: 8px; }
+    a.back { color: var(--ct-neon-soft); display: inline-block; margin-top: 24px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>БАЗА МЕХАНИЗМОВ · CRIMSONTEK</h1>
+  <p style="color:var(--ct-text2);font-size:0.86rem;line-height:1.5;">Справочник классов механизмов с краткой кинематикой и ссылками на учебные модули. Для живой анимации дискового кулачка — <a href="mech_demo.html" style="color:var(--ct-neon-soft);">MECH_DEMO</a>.</p>
+
+  <div class="bar">
+    <select id="cat" aria-label="Категория">
+      <option value="">Все категории</option>
+    </select>
+    <input type="search" id="q" placeholder="Поиск по названию или тегам…">
+  </div>
+  <div class="list" id="root"></div>
+
+  <a class="back" href="dashboard.html">← HUB</a>
+  <a class="back" href="calc_hub.html" style="margin-left:16px;">CALC_HUB</a>
+
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('mechanisms_db'); } catch (e) {}
+
+    var DB = [
+      { cat: 'Кулачковые', name: 'Дисковый кулачок', tags: 'толкатель s phi', text: 'Преобразование вращения в поступательное с ускорениями, зависящими от профиля.', eq: 's(φ) задаётся профилем · см. MECH_DEMO', link: 'mech_demo.html' },
+      { cat: 'Кулачковые', name: 'Цилиндрический кулачок + ролик', tags: 'ролик контакт', text: 'Контакт через ролик снижает износ; участки подъёма/падоя/далёкого хода на развёртке цилиндра.', eq: 'Профиль развёртки = f(φ)', link: null },
+      { cat: 'Рычажные', name: 'Четырёхзвенник (кривошипно-коромысло)', tags: 'Grashof плоский', text: 'Четыре шарнира; при соблюдении условия Грашофа — полный оборот кривошипа.', eq: 'Условие Грашофа: l_min + l_max ≤ сумма двух других', link: null },
+      { cat: 'Рычажные', name: 'Кривошипно-ползун (слайдер-кранк)', tags: 'поршень БСК', text: 'Связь угла кривошипа с положением ползуна и погонной скоростью.', eq: 'x = r·cosφ + √(L² − r²sin²φ) · приближения при L≫r', link: null },
+      { cat: 'Рычажные', name: 'Шатунный механизм двигателя', tags: 'поршень сила', text: 'Преобразование возвратно-поступательного движения поршня из вращения коленвала, сила в шатуне.', eq: 'Динамика: баланс сил и моментов', link: null },
+      { cat: 'Зубчатые', name: 'Пара цилиндрических прямозубых', tags: 'i z1 z2', text: 'Передаточное отношение через числа зубьев; контакт — линейный, шум выше косозубых.', eq: 'i = z2/z1 = ω1/ω2', link: null },
+      { cat: 'Зубчатые', name: 'Косозубая цилиндрическая пара', tags: 'плавность нагрузка', text: 'Постепенный заход зуба, меньше шума, осевые силы — учесть подшипники.', eq: 'β — угол наклона зуба', link: null },
+      { cat: 'Зубчатые', name: 'Червячная передача', tags: 'большое i самоторможение', text: 'Высокие передаточные отношения в компактном узле; КПД зависит от качества изготовления и зацепления.', eq: 'i ≈ z_колеса/заходов червяка', link: null },
+      { cat: 'Зубчатые', name: 'Планетарный редуктор', tags: 'солнечный саттелит', text: 'Компактность, равномерная нагрузка, сложность расчёта и сборки.', eq: 'Зависимости от зажатой звезды', link: null },
+      { cat: 'Ременные / цепные', name: 'Плоскоременная передача', tags: 'натяжение проскальзывание', text: 'Простая кинематика; проскальзывание и износ ремня при неверном натяжении.', eq: 'v ≈ π·d·n', link: null },
+      { cat: 'Ременные / цепные', name: 'Цепная (роликовая)', tags: 'муфта звёздочки', text: 'Жёсткая кинематическая связь; полигональный эффект на скорости.', eq: 'Неисправимый шаг цепи — боковой износ', link: null },
+      { cat: 'Мосты / дифференциалы', name: 'Конический дифференциал', tags: 'авто колёса', text: 'Распределение момента между ведущими колёсами при разной длине пути в повороте.', eq: 'ωл + ωп = 2ωкронштейна', link: null },
+      { cat: 'Храповики / муфты', name: 'Храповик с собачкой', tags: 'стопор однонаправленное', text: 'Односторонний захват; углы и люфт влияют на надёжность.', eq: '—', link: null },
+      { cat: 'Храповики / муфты', name: 'Фрикционная муфта', tags: 'сцепление давление', text: 'Передача касанием; требуется расчёт на прогрев и износ.', eq: 'Момент ∝ F·r·μ·n', link: null },
+      { cat: 'Винтовые', name: 'Шарико-винтовая пара', tags: 'ЧПУ прецизия', text: 'Низкое трение качения, высокий КПД линейного привода.', eq: 'Шаг → линейное смещение за оборот', link: null },
+      { cat: 'Гибкие', name: 'Механизм типа «ЗМЕЙ» (compliant)', tags: '3D-печать', text: 'Перемещения за счёт упругих деформаций; мало трения скольжения.', eq: 'Жёсткость ветвей FEA', link: null },
+      { cat: 'Фрикционные', name: 'Вариатор клиноременный', tags: 'CVT непрерывный', text: 'Непрерывное изменение передаточного; зависит от радиусов на конусах.', eq: 'i = R2/R1', link: null }
+    ];
+
+    var cats = {};
+    DB.forEach(function (x) { cats[x.cat] = true; });
+    var sel = document.getElementById('cat');
+    Object.keys(cats).sort().forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c;
+      o.textContent = c;
+      sel.appendChild(o);
+    });
+
+    function render() {
+      var cat = sel.value;
+      var qq = document.getElementById('q').value.trim().toLowerCase();
+      var root = document.getElementById('root');
+      root.innerHTML = '';
+      DB.filter(function (x) {
+        if (cat && x.cat !== cat) return false;
+        if (!qq) return true;
+        var blob = (x.name + ' ' + x.tags + ' ' + x.text).toLowerCase();
+        return blob.indexOf(qq) >= 0;
+      }).forEach(function (x) {
+        var a = document.createElement('article');
+        a.innerHTML =
+          '<div class="meta">' + escapeHtml(x.cat) + '</div>' +
+          '<h2>' + escapeHtml(x.name) + '</h2>' +
+          '<p>' + escapeHtml(x.text) + '</p>' +
+          '<div class="eq">' + escapeHtml(x.eq) + '</div>' +
+          (x.link ? '<a href="' + escapeHtml(x.link) + '">Открыть модуль →</a>' : '');
+        root.appendChild(a);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    sel.onchange = render;
+    document.getElementById('q').oninput = render;
+    render();
+  </script>
+</body>
+</html>

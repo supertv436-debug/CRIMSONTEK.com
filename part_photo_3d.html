@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // PHOTO → 3D RELIEF</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 14px; display: flex; flex-direction: column; min-height: 100vh; text-transform: none; }
+    h1 { font-size: 0.88rem; color: var(--ct-red); letter-spacing: 0.1em; margin: 0 0 8px 0; }
+    .lead { color: var(--ct-text2); font-size: 0.84rem; line-height: 1.5; max-width: 820px; margin-bottom: 14px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 10px 0; }
+    label { font-size: 0.78rem; color: var(--ct-muted); }
+    input[type="range"] { width: 160px; accent-color: var(--ct-red); }
+    #host { flex: 1; min-height: 420px; border: 1px solid rgba(255,0,51,0.4); background: #000; }
+    a.back { color: var(--ct-neon-soft); margin-top: 14px; font-size: 0.82rem; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }}
+  </script>
+</head>
+<body>
+  <h1>ФОТО ДЕТАЛИ → 3D РЕЛЬЕФ</h1>
+  <p class="lead">Загрузите <strong>фото крупным планом</strong> (однотонный фон лучше). Строится <strong>рельеф по яркости пикселей</strong> — это не полноценная реконструкция CAD, а быстрый объёмный «отпечаток» для презентаций и эскиза. Для точных STL используйте фотограмметрию или <a href="cad_viewer.html" style="color:var(--ct-neon-soft);">STL viewer</a>.</p>
+
+  <div class="row">
+    <input type="file" id="file" accept="image/*">
+    <label>Глубина рельефа <input type="range" id="amp" min="0.05" max="1.2" step="0.05" value="0.45"></label>
+    <label>Сегменты сетки <input type="range" id="seg" min="32" max="200" step="1" value="96"></label>
+  </div>
+
+  <div id="host"></div>
+  <a class="back" href="dashboard.html">← HUB</a>
+
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('part_photo_3d'); } catch (e) {}
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    var host = document.getElementById('host');
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050508);
+
+    var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    camera.position.set(2.8, 2.4, 3.2);
+
+    var renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    host.appendChild(renderer.domElement);
+
+    var controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.AmbientLight(0x6688aa, 0.45));
+    var d1 = new THREE.DirectionalLight(0xffccd0, 1);
+    d1.position.set(4, 10, 6);
+    scene.add(d1);
+    var d2 = new THREE.DirectionalLight(0x4455ff, 0.35);
+    d2.position.set(-3, 2, -4);
+    scene.add(d2);
+
+    var mesh = null;
+
+    function sampleHeights(img, w, h) {
+      var c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      var x = c.getContext('2d');
+      x.drawImage(img, 0, 0, w, h);
+      var d = x.getImageData(0, 0, w, h).data;
+      var arr = new Float32Array(w * h);
+      for (var i = 0; i < w * h; i++) {
+        var o = i * 4;
+        arr[i] = (0.299 * d[o] + 0.587 * d[o + 1] + 0.114 * d[o + 2]) / 255;
+      }
+      return arr;
+    }
+
+    function buildFromImage(img) {
+      if (mesh) {
+        scene.remove(mesh);
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+        mesh = null;
+      }
+      var S = parseInt(document.getElementById('seg').value, 10) || 96;
+      var W = S + 1;
+      var H = S + 1;
+      var heights = sampleHeights(img, W, H);
+      var size = 3.2;
+      var geo = new THREE.PlaneGeometry(size, size, S, S);
+      geo.rotateX(-Math.PI / 2);
+      var pos = geo.attributes.position;
+      var amp = parseFloat(document.getElementById('amp').value) || 0.4;
+      for (var i = 0; i < pos.count; i++) {
+        var vx = pos.getX(i);
+        var vz = pos.getZ(i);
+        var u = Math.floor(((vx / size) + 0.5) * (W - 1));
+        var v = Math.floor(((vz / size) + 0.5) * (H - 1));
+        u = Math.max(0, Math.min(W - 1, u));
+        v = Math.max(0, Math.min(H - 1, v));
+        var hi = heights[v * W + u];
+        pos.setY(i, hi * amp);
+      }
+      geo.computeVertexNormals();
+      var tex = new THREE.Texture(img);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      var mat = new THREE.MeshStandardMaterial({
+        map: tex,
+        metalness: 0.22,
+        roughness: 0.5,
+        flatShading: false
+      });
+      mesh = new THREE.Mesh(geo, mat);
+      scene.add(mesh);
+    }
+
+    document.getElementById('file').addEventListener('change', function (e) {
+      var f = e.target.files[0];
+      if (!f) return;
+      var url = URL.createObjectURL(f);
+      var im = new Image();
+      im.onload = function () {
+        buildFromImage(im);
+        URL.revokeObjectURL(url);
+      };
+      im.src = url;
+    });
+
+    function onResize() {
+      var w = host.clientWidth;
+      var h = Math.max(400, window.innerHeight * 0.55);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onResize);
+    onResize();
+
+    ['amp', 'seg'].forEach(function (id) {
+      document.getElementById(id).addEventListener('input', function () {
+        var inp = document.getElementById('file');
+        if (!inp.files[0]) return;
+        var f = inp.files[0];
+        var url = URL.createObjectURL(f);
+        var im = new Image();
+        im.onload = function () {
+          buildFromImage(im);
+          URL.revokeObjectURL(url);
+        };
+        im.src = url;
+      });
+    });
+
+    function loop() {
+      requestAnimationFrame(loop);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    loop();
+  </script>
+</body>
+</html>

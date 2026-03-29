@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // WORKSPACES</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 18px; max-width: 920px; margin-left: auto; margin-right: auto; }
+    h1 { font-size: 0.95rem; color: var(--ct-red); letter-spacing: 0.12em; margin: 0 0 6px 0; }
+    .sub { color: var(--ct-text2); font-size: 0.86rem; text-transform: none; line-height: 1.55; margin-bottom: 22px; }
+    .block { margin-bottom: 22px; }
+    .block h2 { font-size: 0.75rem; color: var(--ct-flash); letter-spacing: 0.18em; border-bottom: 1px solid rgba(255,0,51,0.3); padding-bottom: 8px; margin: 0 0 12px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    a.tile {
+      display: block; padding: 14px; text-decoration: none; color: var(--ct-text);
+      background: var(--ct-bg2); border: 1px solid rgba(255, 0, 51, 0.35);
+      box-shadow: 0 0 12px rgba(255, 0, 51, 0.12);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    a.tile:hover { border-color: var(--ct-flash); box-shadow: var(--ct-glow-lg); }
+    a.tile strong { color: var(--ct-flash); font-size: 0.82rem; display: block; margin-bottom: 6px; letter-spacing: 0.06em; }
+    a.tile span { font-size: 0.8rem; color: var(--ct-text2); text-transform: none; line-height: 1.45; }
+    .uni { background: rgba(255,0,51,0.06); border: 1px solid rgba(255,0,51,0.45); padding: 14px; text-transform: none; font-size: 0.84rem; color: var(--ct-text2); line-height: 1.5; margin-bottom: 20px; }
+    .back { margin-top: 24px; display: inline-block; color: var(--ct-neon-soft); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <h1>РАБОЧИЕ ПРОСТРАНСТВА · CRIMSONTEK OS</h1>
+  <p class="sub">Модули сгруппированы по типовым ролям. Профиль роли задаётся на COMMAND HUB. AI-ассистент везде использует корпоративную личность CRIMSONTEK (см. <code>crimsonAiSystemPrompt</code> в конфиге).</p>
+
+  <div class="uni">
+    <strong style="color:var(--ct-flash);text-transform:uppercase;font-size:0.72rem;">Универсальный слой</strong><br>
+    Профили ролей — localStorage на HUB. <strong>Сеть:</strong> корпоративные посты на главной и <a href="tech_chat.html" style="color:var(--ct-neon-soft);">NET_TERMINAL</a> для внутренних заметок. Единый ИИ — на HUB. Тема — <code>crimson-theme.css</code>.
+  </div>
+
+  <div class="block">
+    <h2>АРХИТЕКТОРЫ · ВИЗУАЛИЗАЦИЯ И ПЛАНИРОВАНИЕ</h2>
+    <div class="grid">
+      <a href="arch_hub.html" class="tile" onclick="try{crimsonTrackModule('arch_hub')}catch(e){}"><strong>ARCH_HUB</strong><span>3D-блок здания, солнечные тени (упрощённая модель), площади и материалы, эскиз участка, палитра, WebXR-просмотр при поддержке браузера.</span></a>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>ПРОГРАММИСТЫ / IT</h2>
+    <div class="grid">
+      <a href="dev_hub.html" class="tile" onclick="try{crimsonTrackModule('dev_hub')}catch(e){}"><strong>DEV_HUB</strong><span>Терминал в стиле «киношный» UI, локальные «проекты», имитация security-scan, запросы к ИИ для кода и отладки.</span></a>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>АНАЛИТИКИ / ЭКОНОМИСТЫ</h2>
+    <div class="grid">
+      <a href="analytics_hub.html" class="tile" onclick="try{crimsonTrackModule('analytics_hub')}catch(e){}"><strong>ANALYTICS_HUB</strong><span>Импорт CSV, таблица, графики Chart.js, простой тренд и прогноз (экстраполяция + опционально ИИ).</span></a>
+      <a href="ghost_link.html" class="tile" onclick="try{crimsonTrackModule('ghost')}catch(e){}"><strong>GHOST-LINK // PR</strong><span>Корпоративные дашборды активности по экосистеме.</span></a>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>ДИЗАЙНЕРЫ</h2>
+    <div class="grid">
+      <a href="design_hub.html" class="tile" onclick="try{crimsonTrackModule('design_hub')}catch(e){}"><strong>DESIGN_HUB</strong><span>Палитры и гармонии цвета, ИИ-концепты UI/бренда, заметки по макетам (Figma — уровень «описание + экспорт цветов»).</span></a>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>ХИМИКИ / STEM</h2>
+    <div class="grid">
+      <a href="chem_hub.html" class="tile" onclick="try{crimsonTrackModule('chem_hub')}catch(e){}"><strong>CHEM_HUB</strong><span>Молярность, pH, база реакций, графики разбавлений, задачи через ИИ.</span></a>
+      <a href="calc_hub.html" class="tile" onclick="try{crimsonTrackModule('calc_hub')}catch(e){}"><strong>CALC_HUB</strong><span>Инженерные калькуляторы и отчёты.</span></a>
+    </div>
+  </div>
+
+  <a class="back" href="dashboard.html">← COMMAND HUB</a>
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+  </script>
+</body>
+</html>

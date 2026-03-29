@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CRIMSONTEK INDUSTRIES // SPATIAL_STUDIO</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; min-height: 100vh; }
+    #viewport {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    #video-feed {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      width: min(220px, 32vw);
+      border: 1px solid rgba(255, 0, 51, 0.6);
+      box-shadow: var(--ct-glow-lg);
+      transform: scaleX(-1);
+      z-index: 2;
+      opacity: 0.92;
+      pointer-events: none;
+    }
+    .hud {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      max-width: min(420px, 94vw);
+      z-index: 3;
+      background: rgba(11, 11, 11, 0.88);
+      border: 1px solid rgba(255, 0, 51, 0.45);
+      padding: 14px 16px;
+      box-shadow: var(--ct-glow-lg);
+      font-size: 0.82rem;
+      text-transform: none;
+      line-height: 1.45;
+      color: var(--ct-text2);
+    }
+    .hud h1 {
+      margin: 0 0 10px 0;
+      font-size: 0.72rem;
+      color: var(--ct-flash);
+      letter-spacing: 0.2em;
+    }
+    .hud p { margin: 0 0 10px 0; }
+    .hud .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .hud button {
+      background: var(--ct-red);
+      color: #050505;
+      border: none;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      box-shadow: var(--ct-glow);
+    }
+    .hud button.secondary {
+      background: transparent;
+      color: var(--ct-text);
+      border: 1px solid var(--ct-muted);
+      box-shadow: none;
+    }
+    .hud a {
+      display: inline-block;
+      margin-top: 12px;
+      color: var(--ct-neon-soft);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    #status {
+      margin-top: 8px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.72rem;
+      color: var(--ct-flash);
+      text-transform: none;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 1px solid rgba(255, 0, 51, 0.4);
+      color: var(--ct-text);
+      font-size: 0.7rem;
+      margin-right: 6px;
+      margin-top: 6px;
+    }
+    .pill.on { border-color: var(--ct-flash); color: var(--ct-flash); }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="viewport"></div>
+  <video id="video-feed" playsinline muted autoplay></video>
+
+  <div class="hud">
+    <h1>SPATIAL_STUDIO · ЖЕСТОВОЙ 3D</h1>
+    <p>Технологии: <strong>веб-камера</strong>, <strong>MediaPipe Hand Landmarker</strong>, <strong>Three.js</strong>. Сведите большой и указательный палец — линия 3D включается; разведите — штрих фиксируется. Камера нужна по <strong>HTTPS</strong> или localhost.</p>
+    <div>
+      <span class="pill" id="pill-track">ТРЕКИНГ</span>
+      <span class="pill" id="pill-draw">РИСОВАНИЕ</span>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-start">КАМЕРА</button>
+      <button type="button" class="secondary" id="btn-clear">СТЕРЕТЬ 3D</button>
+      <button type="button" class="secondary" id="btn-grid">СЕТКА</button>
+    </div>
+    <div id="status">Инициализация…</div>
+    <a href="dashboard.html">← HUB</a>
+  </div>
+
+  <script src="crimson-stats.js"></script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    if (localStorage.getItem('c_verified') !== 'true') {
+      window.location.href = 'operator_access.html';
+    }
+    try { crimsonTrackModule('spatial'); } catch (e) {}
+
+    const statusEl = document.getElementById('status');
+    const pillTrack = document.getElementById('pill-track');
+    const pillDraw = document.getElementById('pill-draw');
+    const video = document.getElementById('video-feed');
+
+    const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.34/vision_bundle.mjs';
+    const WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.34/wasm';
+    const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+
+    const viewport = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x060606);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(0, 1.2, 6.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.target.set(0, 0.5, 0);
+
+    let grid = new THREE.GridHelper(12, 24, 0x661122, 0x221018);
+    scene.add(grid);
+
+    const amb = new THREE.AmbientLight(0x404040, 1.2);
+    scene.add(amb);
+    const dir = new THREE.DirectionalLight(0xffccd0, 0.9);
+    dir.position.set(2, 8, 4);
+    scene.add(dir);
+
+    const lineGroup = new THREE.Group();
+    scene.add(lineGroup);
+
+    const matStroke = new THREE.LineBasicMaterial({
+      color: 0xff0033,
+      linewidth: 1,
+      transparent: true,
+      opacity: 0.95
+    });
+
+    let handLandmarker = null;
+    let lastVidTime = -1;
+    let streamRunning = false;
+    let rafPredict = 0;
+
+    const worldSmooth = new THREE.Vector3();
+    let drawing = false;
+    let currentPoints = [];
+    const PINCH_ON = 0.045;
+    const PINCH_OFF = 0.065;
+
+    function setStatus(t) {
+      statusEl.textContent = t;
+    }
+
+    function tipToWorld(lm, videoW, videoH) {
+      const scale = 5;
+      const x = -(lm.x - 0.5) * 2 * scale;
+      const y = -(lm.y - 0.5) * 2 * scale;
+      const z = (lm.z || 0) * scale * 1.8 + 0.3;
+      return new THREE.Vector3(x, y + 0.8, z);
+    }
+
+    function pinchDist(landmarks) {
+      const a = landmarks[4];
+      const b = landmarks[8];
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dz = (a.z || 0) - (b.z || 0);
+      return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    function flushStroke() {
+      if (currentPoints.length < 2) {
+        currentPoints = [];
+        return;
+      }
+      const geom = new THREE.BufferGeometry().setFromPoints(currentPoints);
+      const line = new THREE.Line(geom, matStroke.clone());
+      lineGroup.add(line);
+      currentPoints = [];
+    }
+
+    function clearDrawings() {
+      for (var i = lineGroup.children.length - 1; i >= 0; i--) {
+        var o = lineGroup.children[i];
+        lineGroup.remove(o);
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      }
+      currentPoints = [];
+    }
+
+    document.getElementById('btn-clear').onclick = clearDrawings;
+
+    let gridVisible = true;
+    document.getElementById('btn-grid').onclick = function () {
+      gridVisible = !gridVisible;
+      grid.visible = gridVisible;
+    };
+
+    async function initMediaPipe() {
+      setStatus('Загрузка MediaPipe…');
+      const { HandLandmarker, FilesetResolver } = await import(MP);
+      const vision = await FilesetResolver.forVisionTasks(WASM);
+      const opts = (del) => ({
+        baseOptions: { modelAssetPath: MODEL, delegate: del },
+        runningMode: 'VIDEO',
+        numHands: 1
+      });
+      try {
+        handLandmarker = await HandLandmarker.createFromOptions(vision, opts('GPU'));
+      } catch (e1) {
+        console.warn('GPU delegate failed, trying CPU', e1);
+        handLandmarker = await HandLandmarker.createFromOptions(vision, opts('CPU'));
+      }
+      setStatus('Модель рук готова. Включите камеру.');
+    }
+
+    function onHands(result, v) {
+      if (!result.landmarks || !result.landmarks.length) {
+        pillTrack.classList.remove('on');
+        pillDraw.classList.remove('on');
+        if (drawing) {
+          drawing = false;
+          flushStroke();
+        }
+        return;
+      }
+      pillTrack.classList.add('on');
+      const lm = result.landmarks[0];
+      const d = pinchDist(lm);
+      const wantDraw = drawing ? d < PINCH_OFF : d < PINCH_ON;
+
+      const tip = lm[8];
+      const target = tipToWorld(tip, v.videoWidth, v.videoHeight);
+      worldSmooth.lerp(target, 0.42);
+
+      if (wantDraw) {
+        pillDraw.classList.add('on');
+        if (!drawing) {
+          drawing = true;
+          currentPoints = [worldSmooth.clone()];
+        } else {
+          const last = currentPoints[currentPoints.length - 1];
+          if (last.distanceTo(worldSmooth) > 0.018) {
+            currentPoints.push(worldSmooth.clone());
+            const maxPt = 8000;
+            if (currentPoints.length > maxPt) currentPoints.splice(0, currentPoints.length - maxPt);
+          }
+        }
+      } else {
+        pillDraw.classList.remove('on');
+        if (drawing) {
+          drawing = false;
+          flushStroke();
+        }
+      }
+    }
+
+    function predictLoop() {
+      if (!streamRunning || !handLandmarker || video.readyState < 2) {
+        rafPredict = requestAnimationFrame(predictLoop);
+        return;
+      }
+      const now = performance.now();
+      if (video.currentTime !== lastVidTime) {
+        lastVidTime = video.currentTime;
+        try {
+          const result = handLandmarker.detectForVideo(video, now);
+          onHands(result, video);
+        } catch (e) {
+          setStatus('Ошибка трекинга: ' + (e.message || e));
+        }
+      }
+      rafPredict = requestAnimationFrame(predictLoop);
+    }
+
+    function resize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+
+    document.getElementById('btn-start').onclick = async function () {
+      if (streamRunning) {
+        streamRunning = false;
+        cancelAnimationFrame(rafPredict);
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(function (t) { t.stop(); });
+          video.srcObject = null;
+        }
+        this.textContent = 'КАМЕРА';
+        setStatus('Поток остановлен.');
+        pillTrack.classList.remove('on');
+        pillDraw.classList.remove('on');
+        if (drawing) {
+          drawing = false;
+          flushStroke();
+        }
+        return;
+      }
+      if (!handLandmarker) {
+        try {
+          await initMediaPipe();
+        } catch (e) {
+          setStatus('Не удалось загрузить MediaPipe (сеть/CORS). Попробуйте HTTPS.');
+          console.error(e);
+          return;
+        }
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        await video.play();
+        streamRunning = true;
+        lastVidTime = -1;
+        this.textContent = 'СТОП';
+        setStatus('Камера активна · жест pinch для линии');
+        predictLoop();
+      } catch (e) {
+        setStatus('Нет доступа к камере. Разрешите в браузере.');
+      }
+    };
+
+    function tick() {
+      requestAnimationFrame(tick);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    tick();
+
+    initMediaPipe().catch(function (e) {
+      setStatus('MediaPipe: отложенная загрузка при старте камеры.');
+      console.warn(e);
+    });
+  </script>
+</body>
+</html>

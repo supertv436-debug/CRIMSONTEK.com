@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+    <script src="crimson-require-login.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRIMSONTEK INDUSTRIES // ИНЖЕНЕРНЫЙ ОТЧЁТ</title>
+  <link rel="stylesheet" href="crimson-theme.css">
+  <style>
+    body { margin: 0; padding: 16px; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 2;
+    }
+    .toolbar button {
+      background: var(--ct-red);
+      color: #050505;
+      border: none;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      box-shadow: var(--ct-glow);
+    }
+    .toolbar a { color: var(--ct-neon-soft); font-size: 0.82rem; margin-left: 8px; }
+    @media print {
+      .toolbar { display: none; }
+      body { background: #fff; color: #111; }
+      #report { border: none; box-shadow: none; color: #111; }
+      #report h1, #report h2 { color: #111; }
+    }
+    #report {
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--ct-bg2);
+      border: 1px solid rgba(255, 0, 51, 0.35);
+      padding: 28px 32px;
+      box-shadow: var(--ct-glow-lg);
+      text-transform: none;
+      color: var(--ct-text);
+      line-height: 1.55;
+    }
+    #report h1 {
+      font-size: 1.1rem;
+      color: var(--ct-flash);
+      margin: 0 0 8px 0;
+    }
+    #report .meta { font-size: 0.88rem; color: var(--ct-text2); margin-bottom: 20px; }
+    #report h2 {
+      font-size: 0.85rem;
+      color: var(--ct-red);
+      margin: 22px 0 10px 0;
+      border-bottom: 1px solid rgba(255, 0, 51, 0.25);
+      padding-bottom: 6px;
+    }
+    #report label { display: block; font-size: 0.78rem; color: var(--ct-text2); margin-top: 10px; }
+    #report input, #report textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--ct-bg);
+      border: 1px solid var(--ct-red-dark);
+      color: var(--ct-text);
+      padding: 10px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      margin-top: 4px;
+    }
+    #report textarea { min-height: 100px; resize: vertical; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button type="button" onclick="window.print()">ПЕЧАТЬ / PDF</button>
+    <a href="calc_hub.html">← CALC_HUB</a>
+  </div>
+
+  <article id="report">
+    <h1>Инженерный лист · CRIMSONTEK</h1>
+    <div class="meta" id="meta-auto"></div>
+
+    <h2>1. Проект и ответственный</h2>
+    <label>Название / объект</label>
+    <input type="text" id="f-title" placeholder="Узел, стойка, контур…">
+    <label>Оператор</label>
+    <input type="text" id="f-op" placeholder="ФИО / позывной">
+
+    <h2>2. Исходные данные</h2>
+    <label>Нагрузки, геометрия, материал</label>
+    <textarea id="f-inputs" placeholder="σ доп, моменты, размеры, требования…"></textarea>
+
+    <h2>3. Расчёты и допущения</h2>
+    <label>Формулы, коэффициенты, нормы</label>
+    <textarea id="f-calc" placeholder="Ход расчёта, ссылки на модули CALC_HUB…"></textarea>
+
+    <h2>4. Вывод</h2>
+    <label>Заключение</label>
+    <textarea id="f-out" placeholder="Проходит / не проходит, запасы, рекомендации…"></textarea>
+  </article>
+
+  <script src="crimson-stats.js"></script>
+  <script>
+    if (localStorage.getItem('c_verified') !== 'true') location.href = 'operator_access.html';
+    try { crimsonTrackModule('calc_report'); } catch (e) {}
+
+    var meta = document.getElementById('meta-auto');
+    var op = localStorage.getItem('c_user') || '';
+    var d = new Date();
+    meta.textContent = 'Сформировано: ' + d.toLocaleString('ru-RU') + (op ? ' · учётная запись: ' + op : '');
+    var fo = document.getElementById('f-op');
+    if (op && !fo.value) fo.placeholder = op;
+  </script>
+</body>
+</html>
