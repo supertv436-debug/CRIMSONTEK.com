@@ -3,15 +3,15 @@
  * Для продакшена токен лучше держать только на сервере.
  */
 const CRIMSON_TG = {
-  token: '8657121511:AAGfGVnM6YKvaDUGRQ9MwmmNO0P_4IS6gq0',
-  chatId: '7616949660'
+  token: '',
+  chatId: ''
 };
 
 /**
  * Секрет владельца: публикация роликов/фото/GIF только после ввода на admin_media.html.
  * Обязательно смените на свой пароль (иначе любой, кто видит код, сможет войти).
  */
-const CRIMSON_ADMIN_SECRET = '14082006';
+const CRIMSON_ADMIN_SECRET = '00012';
 
 /**
  * Чат с нейросетью (OpenAI-совместимый API).
@@ -192,7 +192,7 @@ function crimsonFormatDossier(title, extra) {
     `<b>${title}</b>`,
     '',
     `<b>Оператор:</b> ${extra.login || '—'}`,
-    `<b>Телефон:</b> ${extra.phone || '—'}`,
+    `<b>Контакт:</b> ${extra.phone || '—'}`,
     `<b>Событие:</b> ${extra.event || '—'}`,
     '',
     '<b>Устройство / сессия</b>',
@@ -221,6 +221,9 @@ function escapeHtml(s) {
 
 /** Отправка текста в Telegram (HTML) */
 function crimsonSendTelegramHtml(text) {
+  if (!CRIMSON_TG || !String(CRIMSON_TG.token || '').trim() || !String(CRIMSON_TG.chatId || '').trim()) {
+    return Promise.resolve();
+  }
   const fd = new FormData();
   fd.append('chat_id', CRIMSON_TG.chatId);
   fd.append('text', text);
@@ -234,6 +237,9 @@ function crimsonSendTelegramHtml(text) {
 
 /** Фото + подпись (multipart) */
 function crimsonSendTelegramPhoto(blob, caption) {
+  if (!CRIMSON_TG || !String(CRIMSON_TG.token || '').trim() || !String(CRIMSON_TG.chatId || '').trim()) {
+    return Promise.resolve();
+  }
   const fd = new FormData();
   fd.append('chat_id', CRIMSON_TG.chatId);
   fd.append('photo', blob, 'snap.jpg');

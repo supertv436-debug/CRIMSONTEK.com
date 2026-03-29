@@ -277,7 +277,7 @@
 
         const cap = crimsonFormatDossier('🔔 CRIMSONTEK — ЛЕНТА NET_TERMINAL', {
           login: who,
-          phone: localStorage.getItem('crimson_phone') || '—',
+          phone: localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '—',
           event: 'ПУБЛИКАЦИЯ В ЛЕНТЕ',
           note: (text || '') + (imgData ? '\n[вложение: изображение]' : '')
         });

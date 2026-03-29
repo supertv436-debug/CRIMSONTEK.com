@@ -112,9 +112,13 @@
           localStorage.removeItem('c_pass');
           localStorage.removeItem('c_verified');
           localStorage.removeItem('crimson_phone');
+          localStorage.removeItem('crimson_email');
+          localStorage.removeItem('c_auth_rev');
           localStorage.removeItem('c_role');
           localStorage.removeItem('crimson_ai_key');
-          localStorage.removeItem('crimson_admin_feed_unlock');
+          sessionStorage.removeItem('crimson_admin_feed_unlock');
+          sessionStorage.removeItem('crimson_admin_media_ok');
+          sessionStorage.removeItem('crimson_pending_reg_otp');
         } catch (e) {}
         location.href = 'operator_access.html';
       }

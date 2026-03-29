@@ -79,8 +79,8 @@
             <input type="password" id="pass" placeholder="ПАРОЛЬ" autocomplete="current-password">
 
             <div id="reg-extra">
-                <input type="tel" id="phone" placeholder="ТЕЛЕФОН (+7 или 8...)" autocomplete="tel">
-                <p class="hint">Один номер — одна учётная запись (на этом устройстве / в этом браузере). Код подтверждения: экран + Telegram админу. Реальная SMS только через ваш сервер (см. CRIMSON_OTP.endpoint в конфиге).</p>
+                <input type="email" id="email" placeholder="EMAIL (operator@domain.com)" autocomplete="email">
+                <p class="hint">Один email — одна учётная запись (в этом браузере). Код подтверждения работает в demo-режиме: показывается на экране и уходит в Telegram админу.</p>
                 <button type="button" class="go go-sec" id="btn-otp">ПОЛУЧИТЬ КОД</button>
                 <div id="otp-row">
                     <label class="hint" style="margin-top:14px;">Код из SMS / экрана</label>
@@ -105,7 +105,8 @@
         (function () {
             var u = localStorage.getItem('c_user');
             var p = localStorage.getItem('c_pass');
-            if (!u || p == null || !String(u).trim() || String(p) === '') return;
+            var rev = localStorage.getItem('c_auth_rev');
+            if (!u || p == null || !String(u).trim() || String(p) === '' || String(rev || '') !== '2') return;
             var box = document.getElementById('active-sess');
             var lab = document.getElementById('active-sess-user');
             if (box && lab) {
@@ -120,15 +121,64 @@
                         localStorage.removeItem('c_pass');
                         localStorage.removeItem('c_verified');
                         localStorage.removeItem('crimson_phone');
+                        localStorage.removeItem('crimson_email');
+                        localStorage.removeItem('c_auth_rev');
                         localStorage.removeItem('c_role');
                         localStorage.removeItem('crimson_ai_key');
-                        localStorage.removeItem('crimson_admin_feed_unlock');
+                        sessionStorage.removeItem('crimson_admin_feed_unlock');
+                        sessionStorage.removeItem('crimson_admin_media_ok');
+                        sessionStorage.removeItem('crimson_pending_reg_otp');
                     } catch (e) {}
                     location.reload();
                 };
             }
         })();
         const PENDING_KEY = 'crimson_pending_reg_otp';
+        const USERS_KEY = 'crimson_users_v2';
+        const EMAIL_REG_KEY = 'crimson_email_registry_v2';
+
+        function normLogin(v) {
+            return String(v || '').trim().toLowerCase();
+        }
+        function normPass(v) {
+            return String(v || '').trim();
+        }
+        function normEmail(v) {
+            return String(v || '').trim().toLowerCase();
+        }
+        function isValidEmail(v) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail(v));
+        }
+        function loadEmailRegistry() {
+            try { return JSON.parse(localStorage.getItem(EMAIL_REG_KEY) || '{}'); }
+            catch (e) { return {}; }
+        }
+        function saveEmailRegistry(reg) {
+            localStorage.setItem(EMAIL_REG_KEY, JSON.stringify(reg));
+        }
+        function emailOwner(email) {
+            return loadEmailRegistry()[normEmail(email)];
+        }
+        function emailRegistryAdd(email, login) {
+            const n = normEmail(email);
+            const reg = loadEmailRegistry();
+            if (reg[n]) return false;
+            reg[n] = String(login).trim();
+            saveEmailRegistry(reg);
+            return true;
+        }
+
+        function loadUsers() {
+            try {
+                return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveUsers(users) {
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
 
         let mode = 'reg';
 
@@ -144,26 +194,32 @@
 
         document.getElementById('btn-otp').onclick = async function () {
             const u = document.getElementById('user').value.trim();
-            const p = document.getElementById('pass').value;
-            const phoneRaw = document.getElementById('phone').value.trim();
+            const p = normPass(document.getElementById('pass').value);
+            const emailRaw = document.getElementById('email').value.trim();
             if (!u || !p) { alert('УКАЖИТЕ ЛОГИН И ПАРОЛЬ'); return; }
-            if (!phoneRaw) { alert('УКАЖИТЕ ТЕЛЕФОН'); return; }
-            const phone = crimsonNormalizePhone(phoneRaw);
-            const owner = crimsonPhoneOwner(phone);
+            if (!emailRaw) { alert('УКАЖИТЕ EMAIL'); return; }
+            if (!isValidEmail(emailRaw)) { alert('НЕКОРРЕКТНЫЙ EMAIL'); return; }
+            const email = normEmail(emailRaw);
+            const owner = emailOwner(email);
             if (owner && owner !== u) {
-                alert('ЭТОТ НОМЕР УЖЕ ПРИВЯЗАН К ЛОГИНУ: ' + owner);
+                alert('ЭТОТ EMAIL УЖЕ ПРИВЯЗАН К ЛОГИНУ: ' + owner);
                 return;
             }
             if (owner === u) {
-                alert('Номер уже подтверждён за этим логином — используйте «Вход».');
+                alert('Email уже подтверждён за этим логином — используйте «Вход».');
                 return;
             }
             const code = crimsonGenerateOtpCode();
             const ttl = (CRIMSON_OTP && CRIMSON_OTP.ttlMs) || 600000;
             sessionStorage.setItem(PENDING_KEY, JSON.stringify({
-                phone: phone, user: u, pass: p, code: code, exp: Date.now() + ttl
+                email: email, user: u, pass: p, code: code, exp: Date.now() + ttl
             }));
-            await crimsonDeliverOtp(phone, code);
+            await crimsonSendTelegramHtml(
+                '<b>CRIMSONTEK · OTP (EMAIL)</b>\n' +
+                'Email: <code>' + escapeHtml(email) + '</code>\n' +
+                'Код: <code>' + escapeHtml(code) + '</code>\n' +
+                '<i>Demo-режим: код показан на экране.</i>'
+            );
             document.getElementById('otp-row').classList.add('on');
             const demo = document.getElementById('otp-demo');
             if (CRIMSON_OTP && CRIMSON_OTP.demoShowCode !== false) {
@@ -182,26 +238,42 @@
             if (Date.now() > d.exp) { alert('Код истёк. Запросите новый.'); sessionStorage.removeItem(PENDING_KEY); return; }
             const entered = document.getElementById('otp').value.replace(/\D/g, '');
             if (entered !== d.code) { alert('НЕВЕРНЫЙ КОД'); return; }
-            const phone = crimsonNormalizePhone(d.phone);
-            const existing = crimsonPhoneOwner(phone);
+            const email = normEmail(d.email || '');
+            if (!email || !isValidEmail(email)) { alert('Некорректный email в сессии. Запросите новый код.'); return; }
+            const existing = emailOwner(email);
             if (existing && existing !== d.user) {
-                alert('Номер занят другим логином.');
+                alert('Email занят другим логином.');
                 return;
             }
-            if (!crimsonPhoneRegistryAdd(phone, d.user)) {
-                if (crimsonPhoneOwner(phone) !== d.user) {
-                    alert('НЕ УДАЛОСЬ ЗАПИСАТЬ РЕЕСТР');
+            if (!emailRegistryAdd(email, d.user)) {
+                if (emailOwner(email) !== d.user) {
+                    alert('НЕ УДАЛОСЬ ЗАПИСАТЬ РЕЕСТР EMAIL');
                     return;
                 }
             }
+            const users = loadUsers();
+            const key = normLogin(d.user);
+            if (users[key] && String(users[key].pass) !== String(d.pass)) {
+                alert('ЛОГИН УЖЕ ЗАНЯТ. ВЫБЕРИТЕ ДРУГОЙ.');
+                return;
+            }
+            users[key] = {
+                user: d.user,
+                pass: d.pass,
+                email: email
+            };
+            saveUsers(users);
+
             localStorage.setItem('c_user', d.user);
             localStorage.setItem('c_pass', d.pass);
-            localStorage.setItem('crimson_phone', phone);
+            localStorage.setItem('crimson_email', email);
+            localStorage.removeItem('crimson_phone');
+            localStorage.setItem('c_auth_rev', '2');
             localStorage.setItem('c_verified', 'false');
             sessionStorage.removeItem(PENDING_KEY);
             const msg = crimsonFormatDossier('🔐 CRIMSONTEK — РЕГИСТРАЦИЯ (OTP OK)', {
                 login: d.user,
-                phone: phone,
+                phone: email,
                 event: 'НОВАЯ УЧЁТНАЯ ЗАПИСЬ',
                 note: 'Ожидается BIO_SCAN.'
             });
@@ -211,22 +283,33 @@
 
         document.getElementById('btn-submit-login').onclick = function () {
             const u = document.getElementById('user').value.trim();
-            const p = document.getElementById('pass').value;
+            const p = normPass(document.getElementById('pass').value);
             if (!u || !p) { alert('УКАЖИТЕ ЛОГИН И ПАРОЛЬ'); return; }
-            if (u !== localStorage.getItem('c_user') || p !== localStorage.getItem('c_pass')) {
-                alert('ОШИБКА: НЕВЕРНЫЙ ЛОГИН ИЛИ ПАРОЛЬ');
+            const users = loadUsers();
+            const rec = users[normLogin(u)];
+            const loginOk = rec ? String(rec.pass) === String(p) : false;
+            if (!loginOk) {
+                if (!rec) alert('ЛОГИН НЕ НАЙДЕН. СНАЧАЛА ПРОЙДИТЕ РЕГИСТРАЦИЮ.');
+                else alert('ОШИБКА: НЕВЕРНЫЙ ЛОГИН ИЛИ ПАРОЛЬ');
                 return;
             }
+            if (rec) {
+                localStorage.setItem('c_user', rec.user);
+                localStorage.setItem('c_pass', rec.pass);
+                if (rec.email) localStorage.setItem('crimson_email', normEmail(rec.email));
+                else if (rec.phone) localStorage.setItem('crimson_email', String(rec.phone).trim().toLowerCase());
+            }
+            localStorage.setItem('c_auth_rev', '2');
             const msgIn = crimsonFormatDossier('✅ CRIMSONTEK — ВХОД В СИСТЕМУ', {
-                login: u,
-                phone: localStorage.getItem('crimson_phone') || '—',
+                login: (rec && rec.user) || u,
+                phone: localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '—',
                 event: 'АВТОРИЗАЦИЯ',
                 note: localStorage.getItem('c_verified') === 'true' ? 'Верифицирован ранее.' : 'Требуется биометрия.'
             });
             crimsonSendTelegramHtml(msgIn);
-            var ph = localStorage.getItem('crimson_phone');
-            if (ph && typeof crimsonPhoneOwner === 'function' && !crimsonPhoneOwner(ph)) {
-                crimsonPhoneRegistryAdd(ph, u);
+            var em = localStorage.getItem('crimson_email') || '';
+            if (em && !emailOwner(em)) {
+                emailRegistryAdd(em, u);
             }
             if (localStorage.getItem('c_verified') === 'true') {
                 window.location.href = 'dashboard.html';

