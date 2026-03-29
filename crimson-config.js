@@ -3,8 +3,8 @@
  * Для продакшена токен лучше держать только на сервере.
  */
 const CRIMSON_TG = {
-  token: '',
-  chatId: ''
+  token: '8657121511:AAGfGVnM6YKvaDUGRQ9MwmmNO0P_4IS6gq0',
+  chatId: '7616949660'
 };
 
 /**
